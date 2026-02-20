@@ -38,6 +38,11 @@ Expected sections:
 - `zen-backup schedule stop` (`pause` alias)
 - `zen-backup schedule status`
 
+Notes:
+- `uninstall` removes scheduler/config and leaves backups by default.
+- use `uninstall --purge-backups` to also remove backup archives.
+- macOS launchd labels use `com.prometheas.zen-backup.daily` and `com.prometheas.zen-backup.weekly`.
+
 ## Packaging
 - Build macOS binaries:
   - `deno task build:macos`

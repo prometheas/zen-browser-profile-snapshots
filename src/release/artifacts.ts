@@ -43,8 +43,10 @@ Commit: ${metadata.commit}
 - Manual backup commands: \`backup daily\`, \`backup weekly\`
 - Restore command with pre-restore safety copy: \`restore <archive>\`
 - Snapshot visibility commands: \`list\`, \`status\`
+- Schedule management commands: \`schedule start|stop|status\` with \`resume/pause\` aliases
 - Retention pruning for local and cloud backup directories
 - macOS install/uninstall flow with launchd plist generation
+- launchd job namespace: \`com.prometheas.zen-backup.*\`
 - Release artifacts for Apple Silicon and Intel macOS binaries
 
 ## Artifacts
