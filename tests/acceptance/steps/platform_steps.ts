@@ -63,8 +63,8 @@ Given("the launchd agent {string} is loaded", async function (this: ZenWorld, _l
   await ensurePlatformConfig(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
   await Deno.mkdir(agentsDir, { recursive: true });
-  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.daily.plist"), "<plist/>");
-  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.weekly.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.daily.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.weekly.plist"), "<plist/>");
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
 });
 
@@ -72,16 +72,16 @@ Given("the launchd agents are loaded", async function (this: ZenWorld) {
   await ensurePlatformConfig(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
   await Deno.mkdir(agentsDir, { recursive: true });
-  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.daily.plist"), "<plist/>");
-  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.weekly.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.daily.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.weekly.plist"), "<plist/>");
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
 });
 
 Given("no launchd agents are loaded", async function (this: ZenWorld) {
   await ensurePlatformConfig(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
-  await Deno.remove(join(agentsDir, "com.zen-backup.daily.plist")).catch(() => undefined);
-  await Deno.remove(join(agentsDir, "com.zen-backup.weekly.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.daily.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.weekly.plist")).catch(() => undefined);
   await Deno.remove(join(agentsDir, ".zen-backup-loaded")).catch(() => undefined);
 });
 
@@ -232,7 +232,7 @@ Then("the file contains [retention] section", async function (this: ZenWorld) {
 });
 
 Then("{string} exists in {string}", async function (this: ZenWorld, file: string, folder: string) {
-  const path = join(expandKnownPath(this, folder), file);
+  const path = join(expandKnownPath(this, folder), normalizeLegacyName(file));
   assertEquals(await exists(path), true);
 });
 
@@ -241,12 +241,14 @@ Then("the agents are loaded and enabled", async function (this: ZenWorld) {
 });
 
 Then("the plist files contain actual paths, not placeholders", async function (this: ZenWorld) {
-  const daily = await Deno.readTextFile(join(this.cwd, "Library", "LaunchAgents", "com.zen-backup.daily.plist"));
+  const daily = await Deno.readTextFile(
+    join(this.cwd, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist"),
+  );
   assertEquals(daily.includes("$HOME"), false);
 });
 
 Then("{string} is removed from {string}", async function (this: ZenWorld, file: string, folder: string) {
-  const path = join(expandKnownPath(this, folder), file);
+  const path = join(expandKnownPath(this, folder), normalizeLegacyName(file));
   assertEquals(await exists(path), false);
 });
 
@@ -271,13 +273,15 @@ Then("suggests running with appropriate permissions", function (this: ZenWorld) 
 });
 
 Then("a launchd agent {string} is loaded", function (this: ZenWorld, label: string) {
-  assertStringIncludes(this.stdout, label);
+  assertStringIncludes(this.stdout, normalizeLegacyName(label).replace(".plist", ""));
 });
 
 Then(
   "the agent is configured to run at the configured daily_time \\(default: 12:30\\)",
   async function (this: ZenWorld) {
-    const plist = await Deno.readTextFile(join(this.cwd, "Library", "LaunchAgents", "com.zen-backup.daily.plist"));
+    const plist = await Deno.readTextFile(
+      join(this.cwd, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist"),
+    );
     assertStringIncludes(plist, "<integer>12</integer>");
     assertStringIncludes(plist, "<integer>30</integer>");
   },
@@ -287,7 +291,7 @@ Then(
   "the agent is configured to run at the configured weekly_day and weekly_time \\(default: Sunday {int}:{int})",
   async function (this: ZenWorld, hour: number, minute: number) {
     const plist = await Deno.readTextFile(
-      join(this.cwd, "Library", "LaunchAgents", "com.zen-backup.weekly.plist"),
+      join(this.cwd, "Library", "LaunchAgents", "com.prometheas.zen-backup.weekly.plist"),
     );
     assertStringIncludes(plist, "<key>Weekday</key>");
     assertStringIncludes(plist, `<integer>${hour}</integer>`);
@@ -297,7 +301,7 @@ Then(
 
 Then("{string} is replaced with the user's home directory", async function (this: ZenWorld, token: string) {
   const plist = await Deno.readTextFile(
-    join(this.cwd, "Library", "LaunchAgents", "com.zen-backup.daily.plist"),
+    join(this.cwd, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist"),
   );
   assertEquals(plist.includes(token), false);
   assertStringIncludes(plist, this.cwd);
@@ -317,7 +321,7 @@ Then("output is written to the log file", async function (this: ZenWorld) {
 });
 
 Then("stdout lists {string}", function (this: ZenWorld, value: string) {
-  assertStringIncludes(this.stdout, value);
+  assertStringIncludes(this.stdout, normalizeLegacyName(value).replace(".plist", ""));
 });
 
 Then("a macOS notification is displayed with title {string}", async function (this: ZenWorld, title: string) {
@@ -415,4 +419,8 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function normalizeLegacyName(value: string): string {
+  return value.replace("com.zen-backup", "com.prometheas.zen-backup");
 }

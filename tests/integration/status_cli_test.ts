@@ -91,8 +91,8 @@ Deno.test("status reports active scheduled jobs marker and stale warning", async
   await Deno.mkdir(configDir, { recursive: true });
   await Deno.mkdir(agentsDir, { recursive: true });
   await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-01.tar.gz"), new Uint8Array(1024));
-  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.daily.plist"), "<plist/>");
-  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.weekly.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.daily.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.weekly.plist"), "<plist/>");
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
@@ -112,5 +112,5 @@ Deno.test("status reports active scheduled jobs marker and stale warning", async
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "Warning: latest daily backup is stale.");
   assertStringIncludes(result.stdout, "Scheduled jobs: active");
-  assertStringIncludes(result.stdout, "com.zen-backup.daily");
+  assertStringIncludes(result.stdout, "com.prometheas.zen-backup.daily");
 });

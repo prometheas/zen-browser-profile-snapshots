@@ -33,7 +33,10 @@ Expected sections:
 - `zen-backup list`
 - `zen-backup status`
 - `zen-backup install`
-- `zen-backup uninstall`
+- `zen-backup uninstall [--purge-backups]`
+- `zen-backup schedule start` (`resume` alias)
+- `zen-backup schedule stop` (`pause` alias)
+- `zen-backup schedule status`
 
 ## Packaging
 - Build macOS binaries:

@@ -27,16 +27,16 @@ Given("the backup scheduled jobs are installed", async function (this: ZenWorld)
   await ensureInstalled(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
   await Deno.mkdir(agentsDir, { recursive: true });
-  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.daily.plist"), "<plist/>");
-  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.weekly.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.daily.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.weekly.plist"), "<plist/>");
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
 });
 
 Given("no backup scheduled jobs are installed", async function (this: ZenWorld) {
   await ensureInstalled(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
-  await Deno.remove(join(agentsDir, "com.zen-backup.daily.plist")).catch(() => undefined);
-  await Deno.remove(join(agentsDir, "com.zen-backup.weekly.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.daily.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.weekly.plist")).catch(() => undefined);
   await Deno.remove(join(agentsDir, ".zen-backup-loaded")).catch(() => undefined);
 });
 

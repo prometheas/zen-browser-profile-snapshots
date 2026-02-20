@@ -17,8 +17,8 @@ Deno.test("install writes config and macOS launchd plists", async () => {
   assertStringIncludes(result.stdout, "Detected profile path");
 
   const configPath = join(tempDir, ".config", "zen-profile-backup", "settings.toml");
-  const dailyPlist = join(tempDir, "Library", "LaunchAgents", "com.zen-backup.daily.plist");
-  const weeklyPlist = join(tempDir, "Library", "LaunchAgents", "com.zen-backup.weekly.plist");
+  const dailyPlist = join(tempDir, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist");
+  const weeklyPlist = join(tempDir, "Library", "LaunchAgents", "com.prometheas.zen-backup.weekly.plist");
   assertEquals(await exists(configPath), true);
   assertEquals(await exists(dailyPlist), true);
   assertEquals(await exists(weeklyPlist), true);
@@ -28,19 +28,52 @@ Deno.test("install writes config and macOS launchd plists", async () => {
   assertStringIncludes(dailyContent, tempDir);
 });
 
-Deno.test("uninstall removes launchd agents and preserves settings", async () => {
+Deno.test("uninstall removes schedule and settings, and preserves backups by default", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const profilePath = join(tempDir, "Library", "Application Support", "zen", "Profiles", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+  await runCli(["install"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  await Deno.mkdir(join(tempDir, "zen-backups", "daily"), { recursive: true });
+  await Deno.writeTextFile(join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz"), "x");
+
+  const result = await runCli(["uninstall"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stderr, "--purge-backups");
+
+  const configPath = join(tempDir, ".config", "zen-profile-backup", "settings.toml");
+  const dailyPlist = join(tempDir, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist");
+  assertEquals(await exists(configPath), false);
+  assertEquals(await exists(dailyPlist), false);
+  assertEquals(await exists(join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz")), true);
+});
+
+Deno.test("schedule start/stop/status and aliases work", async () => {
   const tempDir = await Deno.makeTempDir();
   const profilePath = join(tempDir, "Library", "Application Support", "zen", "Profiles", "default");
   await Deno.mkdir(profilePath, { recursive: true });
   await runCli(["install"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
 
-  const result = await runCli(["uninstall"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
-  assertEquals(result.exitCode, 0);
+  const stop = await runCli(["schedule", "stop"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(stop.exitCode, 0);
+  assertStringIncludes(stop.stdout, "stopped");
+  assertStringIncludes(stop.stdout, "paused");
 
-  const configPath = join(tempDir, ".config", "zen-profile-backup", "settings.toml");
-  const dailyPlist = join(tempDir, "Library", "LaunchAgents", "com.zen-backup.daily.plist");
-  assertEquals(await exists(configPath), true);
-  assertEquals(await exists(dailyPlist), false);
+  const resume = await runCli(["schedule", "resume"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(resume.exitCode, 0);
+  assertStringIncludes(resume.stdout, "started");
+  assertStringIncludes(resume.stdout, "active");
+
+  const pauseAlias = await runCli(["schedule", "pause"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(pauseAlias.exitCode, 0);
+  assertStringIncludes(pauseAlias.stdout, "paused");
+
+  const startAlias = await runCli(["schedule", "start"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(startAlias.exitCode, 0);
+  assertStringIncludes(startAlias.stdout, "active");
+
+  const status = await runCli(["schedule", "status"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(status.exitCode, 0);
+  assertStringIncludes(status.stdout, "com.prometheas.zen-backup.daily");
 });
 
 Deno.test("backup writes notifications when browser running and cloud sync fails", async () => {
