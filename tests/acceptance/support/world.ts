@@ -19,6 +19,12 @@ export class ZenWorld extends World {
   now: Date | undefined = undefined;
   retentionDaily: number | undefined = undefined;
   retentionWeekly: number | undefined = undefined;
+  restoreArchiveName = "";
+  restoreArchivePath = "";
+  restoreEntries: Record<string, string> = {};
+  preRestorePath = "";
+  profileBeforeRestore: Record<string, string> = {};
+  absoluteArchiveSourcePath = "";
 
   async initWorkspace(): Promise<void> {
     this.cwd = await Deno.makeTempDir();
@@ -28,6 +34,12 @@ export class ZenWorld extends World {
     this.now = undefined;
     this.retentionDaily = undefined;
     this.retentionWeekly = undefined;
+    this.restoreArchiveName = "";
+    this.restoreArchivePath = "";
+    this.restoreEntries = {};
+    this.preRestorePath = "";
+    this.profileBeforeRestore = {};
+    this.absoluteArchiveSourcePath = "";
   }
 
   resolvePath(path: string): string {
