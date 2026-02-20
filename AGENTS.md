@@ -34,6 +34,11 @@ When implementation decisions change behavior, update the relevant docs in the s
 - affected `docs/features/**/*.feature`
 - any CLI/docs references (for example `README.md`)
 
+Story/spec boundary:
+- Keep `docs/product/user-stories.md` platform-agnostic (intent, outcomes, acceptance criteria at product level).
+- Put platform-specific behavior, tool choices, and OS mechanics in `docs/features/platform/**/*.feature`.
+- If a decision is macOS/Linux/Windows-specific, update the matching platform feature files, not the user stories.
+
 ## Quality Bar
 - Follow the Constitution: data safety first, fail loudly, restorable by default.
 - Keep behavior consistent across platforms, with platform-specific integrations isolated to adapters.
