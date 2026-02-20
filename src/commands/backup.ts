@@ -2,6 +2,7 @@ import { basename, join } from "jsr:@std/path@1.1.4";
 import { createProfileArchive } from "../archive.ts";
 import { loadConfig } from "../config.ts";
 import { nextArchivePath } from "../core/archive_naming.ts";
+import { pruneArchives } from "../core/retention.ts";
 import { CliError } from "../errors.ts";
 import { appendLog } from "../log.ts";
 import type { RuntimeOptions } from "../types.ts";
@@ -43,12 +44,21 @@ export async function runBackup(
     }
 
     let partialFailure = false;
+    const retentionDays = kind === "daily" ? config.retention.daily_days : config.retention.weekly_days;
+    const now = options.now ?? new Date();
+
+    const localPrune = await pruneArchives(config.backup.local_path, kind, retentionDays, now);
+    for (const path of localPrune.deleted) {
+      await appendLog(config.backup.local_path, "SUCCESS", `pruned old ${kind} backup ${path}`);
+    }
+
     if (config.backup.cloud_path) {
       try {
         const cloudKindDir = join(config.backup.cloud_path, kind);
         await Deno.mkdir(cloudKindDir, { recursive: true });
         const cloudArchivePath = join(cloudKindDir, basename(archivePath));
         await Deno.copyFile(archivePath, cloudArchivePath);
+        await pruneArchives(config.backup.cloud_path, kind, retentionDays, now);
       } catch (error) {
         partialFailure = true;
         const message = error instanceof Error ? error.message : String(error);

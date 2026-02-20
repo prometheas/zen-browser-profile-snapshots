@@ -29,6 +29,7 @@ export interface RuntimeOptions {
   env?: Record<string, string | undefined>;
   os?: Platform;
   cwd?: string;
+  now?: Date;
 }
 
 export interface CommandResult {

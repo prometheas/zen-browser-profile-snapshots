@@ -276,8 +276,65 @@ Deno.test("backup preserves local archive and returns non-zero when cloud sync f
   assertStringIncludes(log, "ERROR");
 });
 
+Deno.test("backup prunes local archives older than configured retention", async () => {
+  const fixedNow = new Date("2026-01-16T12:00:00Z");
+  const { tempDir, profileDir, backupDir } = await createWorkspace({
+    retention: { daily_days: 7, weekly_days: 84 },
+  });
+  await seedPlacesDatabase(join(profileDir, "places.sqlite"));
+
+  await Deno.mkdir(join(backupDir, "daily"), { recursive: true });
+  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz"), new Uint8Array(16));
+  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-10.tar.gz"), new Uint8Array(16));
+  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-05.tar.gz"), new Uint8Array(16));
+
+  const result = await runCli(["backup", "daily"], {
+    cwd: tempDir,
+    os: "darwin",
+    now: fixedNow,
+    env: {
+      HOME: tempDir,
+      ZEN_BACKUP_CONFIG: "custom/settings.toml",
+    },
+  });
+
+  assertEquals(result.exitCode, 0);
+  assertEquals(await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz")), true);
+  assertEquals(await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-10.tar.gz")), true);
+  assertEquals(await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-05.tar.gz")), false);
+});
+
+Deno.test("backup prunes cloud archives older than configured retention", async () => {
+  const cloudRoot = await Deno.makeTempDir({ prefix: "cloud-backups-" });
+  const fixedNow = new Date("2026-01-16T12:00:00Z");
+  const { tempDir, profileDir } = await createWorkspace({
+    cloudPath: cloudRoot,
+    retention: { daily_days: 30, weekly_days: 84 },
+  });
+  await seedPlacesDatabase(join(profileDir, "places.sqlite"));
+
+  await Deno.mkdir(join(cloudRoot, "daily"), { recursive: true });
+  await Deno.writeFile(join(cloudRoot, "daily", "zen-backup-daily-2025-12-01.tar.gz"), new Uint8Array(16));
+
+  const result = await runCli(["backup", "daily"], {
+    cwd: tempDir,
+    os: "darwin",
+    now: fixedNow,
+    env: {
+      HOME: tempDir,
+      ZEN_BACKUP_CONFIG: "custom/settings.toml",
+    },
+  });
+
+  assertEquals(result.exitCode, 0);
+  assertEquals(await pathExists(join(cloudRoot, "daily", "zen-backup-daily-2025-12-01.tar.gz")), false);
+});
+
 async function createWorkspace(
-  options: { cloudPath?: string } = {},
+  options: {
+    cloudPath?: string;
+    retention?: { daily_days: number; weekly_days: number };
+  } = {},
 ): Promise<{ tempDir: string; profileDir: string; backupDir: string }> {
   const tempDir = await Deno.makeTempDir();
   const profileDir = join(tempDir, "profile");
@@ -288,9 +345,10 @@ async function createWorkspace(
   await Deno.mkdir(configDir, { recursive: true });
 
   const cloudLine = options.cloudPath ? `cloud_path = "${options.cloudPath}"\n` : "";
+  const retention = options.retention ?? { daily_days: 30, weekly_days: 84 };
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n${cloudLine}`,
+    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n${cloudLine}\n[retention]\ndaily_days = ${retention.daily_days}\nweekly_days = ${retention.weekly_days}\n`,
   );
 
   return { tempDir, profileDir, backupDir };

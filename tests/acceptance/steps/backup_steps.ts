@@ -81,6 +81,7 @@ When("a daily backup is created", async function (this: ZenWorld) {
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
     os: "darwin",
+    now: this.now,
     env: {
       ...this.env,
       ZEN_BACKUP_CONFIG: "custom/settings.toml",
@@ -97,6 +98,7 @@ When("a weekly backup is created", async function (this: ZenWorld) {
   const result = await runCli(["backup", "weekly"], {
     cwd: this.cwd,
     os: "darwin",
+    now: this.now,
     env: {
       ...this.env,
       ZEN_BACKUP_CONFIG: "custom/settings.toml",
@@ -143,6 +145,7 @@ When("a daily backup is attempted", async function (this: ZenWorld) {
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
     os: "darwin",
+    now: this.now,
     env: {
       ...this.env,
       ZEN_BACKUP_CONFIG: "custom/settings.toml",

@@ -16,12 +16,18 @@ export class ZenWorld extends World {
   cloudPath: string | undefined = undefined;
   sqliteLockProcess: Deno.ChildProcess | null = null;
   sqliteLockWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  now: Date | undefined = undefined;
+  retentionDaily: number | undefined = undefined;
+  retentionWeekly: number | undefined = undefined;
 
   async initWorkspace(): Promise<void> {
     this.cwd = await Deno.makeTempDir();
     this.env = {
       HOME: this.cwd,
     };
+    this.now = undefined;
+    this.retentionDaily = undefined;
+    this.retentionWeekly = undefined;
   }
 
   resolvePath(path: string): string {
