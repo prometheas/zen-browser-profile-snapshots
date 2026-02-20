@@ -1,4 +1,5 @@
 import { join } from "jsr:@std/path@1.1.4";
+import { createProfileArchive } from "../archive.ts";
 import { loadConfig } from "../config.ts";
 import { nextArchivePath } from "../core/archive_naming.ts";
 import { CliError } from "../errors.ts";
@@ -28,7 +29,12 @@ export async function runBackup(
     await Deno.mkdir(kindDir, { recursive: true });
 
     const archivePath = await nextArchivePath(kindDir, kind, new Date());
-    await Deno.writeFile(archivePath, new Uint8Array());
+    try {
+      await createProfileArchive(config.profile.path, archivePath);
+    } catch (error) {
+      await Deno.remove(archivePath).catch(() => undefined);
+      throw error;
+    }
 
     await appendLog(config.backup.local_path, "SUCCESS", `created ${kind} backup ${archivePath}`);
     stdout.push(`Created ${kind} backup: ${archivePath}`);
