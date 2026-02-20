@@ -38,6 +38,7 @@
 **Acceptance criteria:**
 - `zen-backup backup daily` creates a new daily archive immediately
 - The archive appears in the configured local backup directory
+- If an archive already exists for the same day, a numeric suffix is appended (e.g., `-2`, `-3`)
 
 ---
 
@@ -49,6 +50,7 @@
 **Acceptance criteria:**
 - `zen-backup backup weekly` creates a new weekly archive immediately
 - The archive appears in the configured local backup directory
+- If an archive already exists for the same day, a numeric suffix is appended (e.g., `-2`, `-3`)
 
 ---
 
@@ -453,3 +455,11 @@
 - Original profile is not modified (pre-restore backup may have been created)
 - Error message identifies the corrupted archive
 - Error notification is displayed if notifications are enabled
+
+---
+
+## Archive Naming
+
+- Daily: `zen-backup-daily-YYYY-MM-DD.tar.gz`
+- Weekly: `zen-backup-weekly-YYYY-MM-DD.tar.gz`
+- If a same-day archive already exists, append `-2`, `-3`, etc. before the extension
