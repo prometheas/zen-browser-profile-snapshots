@@ -73,7 +73,8 @@ Given("cloud sync is not configured", async function (this: ZenWorld) {
 });
 
 Given("cloud sync is configured to an inaccessible path", async function (this: ZenWorld) {
-  this.cloudPath = "/dev/null/zen-cloud";
+  this.cloudPath = join(this.cwd, "cloud-not-a-directory");
+  await Deno.writeTextFile(this.cloudPath, "not a directory");
   await writeConfig(this, this.profileDir, this.backupDir, this.cloudPath);
 });
 

@@ -254,8 +254,9 @@ Deno.test("backup returns success in local-only mode when cloud sync is disabled
 });
 
 Deno.test("backup preserves local archive and returns non-zero when cloud sync fails", async () => {
+  const tempCloudRoot = await Deno.makeTempFile({ prefix: "not-a-directory-" });
   const { tempDir, profileDir, backupDir } = await createWorkspace({
-    cloudPath: "/dev/null/zen-cloud",
+    cloudPath: tempCloudRoot,
   });
   await seedPlacesDatabase(join(profileDir, "places.sqlite"));
 

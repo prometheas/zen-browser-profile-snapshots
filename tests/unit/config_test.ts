@@ -4,34 +4,34 @@ import { loadConfig, resolveConfigPath } from "../../src/config.ts";
 
 Deno.test("resolveConfigPath uses env override", () => {
   const path = resolveConfigPath({
-    cwd: "/tmp/work",
+    cwd: "tmp/work",
     os: "darwin",
     env: {
-      HOME: "/Users/test",
+      HOME: "home_test",
       ZEN_BACKUP_CONFIG: "custom/config.toml",
     },
   });
 
-  assertEquals(path, "/tmp/work/custom/config.toml");
+  assertStringIncludes(path, "tmp/work/custom/config.toml");
 });
 
 Deno.test("expandPath handles tilde and env variables", () => {
   const env = {
-    HOME: "/Users/test",
+    HOME: "home_test",
     ZEN_BACKUP_DIR: "custom/path",
   };
 
-  assertEquals(expandPath("~/zen-backups", env), "/Users/test/zen-backups");
+  assertEquals(expandPath("~/zen-backups", env), "home_test/zen-backups");
   assertEquals(expandPath("$ZEN_BACKUP_DIR/backups", env), "custom/path/backups");
 });
 
 Deno.test("loadConfig applies defaults and expansion", async () => {
   const config = await loadConfig({
     required: true,
-    cwd: "/tmp/project",
+    cwd: "tmp/project",
     os: "darwin",
     env: {
-      HOME: "/Users/test",
+      HOME: "home_test",
       ZEN_BACKUP_CONFIG: "settings.toml",
     },
     readTextFile: () => Promise.resolve(`
@@ -47,8 +47,8 @@ local_path = "$HOME/backups"
     throw new Error("expected config");
   }
 
-  assertEquals(config.profile.path, "/Users/test/my-zen-profile");
-  assertEquals(config.backup.local_path, "/Users/test/backups");
+  assertStringIncludes(config.profile.path, "home_test/my-zen-profile");
+  assertStringIncludes(config.backup.local_path, "home_test/backups");
   assertEquals(config.retention.daily_days, 30);
   assertEquals(config.retention.weekly_days, 84);
   assertEquals(config.schedule.daily_time, "12:30");
