@@ -18,7 +18,7 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
     return {
       exitCode: 1,
       stdout: "",
-      stderr: "Usage: zen-backup <backup|restore|list|status|install|uninstall|schedule> ...",
+      stderr: usageText(),
     };
   }
 
@@ -34,7 +34,7 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       return {
         exitCode: 1,
         stdout: "",
-        stderr: "Usage: zen-backup backup <daily|weekly>",
+        stderr: `${usageText()}\n\nUsage: zen-backup backup <daily|weekly>`,
       };
     }
     result = await runBackup(kind, options);
@@ -44,7 +44,7 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       return {
         exitCode: 1,
         stdout: "",
-        stderr: "Usage: zen-backup restore <archive>",
+        stderr: `${usageText()}\n\nUsage: zen-backup restore <archive>`,
       };
     }
     result = await runRestore(archive, options);
@@ -65,7 +65,7 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       return {
         exitCode: 1,
         stdout: "",
-        stderr: "Usage: zen-backup schedule <start|stop|pause|resume|status>",
+        stderr: `${usageText()}\n\nUsage: zen-backup schedule <start|stop|pause|resume|status>`,
       };
     }
     result = await runSchedule(action, options);
@@ -82,6 +82,19 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
     stdout: result.stdout.join("\n"),
     stderr: result.stderr.join("\n"),
   };
+}
+
+function usageText(): string {
+  return [
+    "Usage: zen-backup <backup|restore|list|status|install|uninstall|schedule> ...",
+    "  zen-backup backup <daily|weekly>",
+    "  zen-backup restore <archive>",
+    "  zen-backup list",
+    "  zen-backup status",
+    "  zen-backup install",
+    "  zen-backup uninstall [--purge-backups]",
+    "  zen-backup schedule <start|stop|pause|resume|status>",
+  ].join("\n");
 }
 
 if (import.meta.main) {
