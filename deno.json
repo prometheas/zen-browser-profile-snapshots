@@ -1,0 +1,25 @@
+{
+  "fmt": {
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": false
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "tasks": {
+    "test:unit": "deno test -A tests/unit",
+    "test:integration": "deno test -A tests/integration",
+    "test:acceptance": "deno run -A npm:@cucumber/cucumber --import tests/acceptance/support/world.ts --import tests/acceptance/steps/*.ts docs/features/**/*.feature",
+    "test:acceptance:m1": "deno run -A npm:@cucumber/cucumber --import tests/acceptance/support/world.ts --import tests/acceptance/steps/*.ts --name 'Status shows \"Not installed\" when settings.toml is missing|Config path can be overridden via environment variable' docs/features/status.feature docs/features/core/configuration.feature",
+    "test": "deno task test:unit && deno task test:integration",
+    "typecheck": "deno check src/main.ts tests/unit/**/*.ts tests/integration/**/*.ts tests/acceptance/**/*.ts",
+    "lint": "deno lint src tests",
+    "fmt": "deno fmt",
+    "build:macos:arm64": "deno compile --allow-all --target aarch64-apple-darwin --output dist/zen-backup-aarch64-apple-darwin src/main.ts",
+    "build:macos:x64": "deno compile --allow-all --target x86_64-apple-darwin --output dist/zen-backup-x86_64-apple-darwin src/main.ts"
+  }
+}
