@@ -29,6 +29,11 @@ Use these docs as the primary requirements:
 - `docs/product/user-stories.md`
 - `docs/features/`
 
+When implementation decisions change behavior, update the relevant docs in the same change set:
+- `docs/product/user-stories.md`
+- affected `docs/features/**/*.feature`
+- any CLI/docs references (for example `README.md`)
+
 ## Quality Bar
 - Follow the Constitution: data safety first, fail loudly, restorable by default.
 - Keep behavior consistent across platforms, with platform-specific integrations isolated to adapters.
