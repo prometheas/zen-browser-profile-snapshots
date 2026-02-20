@@ -45,6 +45,13 @@ export class ZenWorld extends World {
   resolvePath(path: string): string {
     return resolve(this.cwd, path);
   }
+
+  envWithHome(): Record<string, string | undefined> {
+    return {
+      HOME: this.cwd,
+      ...this.env,
+    };
+  }
 }
 
 setWorldConstructor(ZenWorld);

@@ -1,6 +1,7 @@
 import { DataTable, Given, Then } from "npm:@cucumber/cucumber@12.6.0";
 import { assert } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
+import { runCli } from "../../../src/main.ts";
 import { ZenWorld } from "../support/world.ts";
 
 Given("the backup directory exists but contains no daily archives", async function (this: ZenWorld) {
@@ -24,16 +25,32 @@ Given("the backup directory contains archives totaling {int} MB", async function
 
 Given("the backup scheduled jobs are installed", async function (this: ZenWorld) {
   await ensureInstalled(this);
-  await Deno.writeTextFile(join(this.backupDir, ".scheduler-installed"), "1");
+  const agentsDir = join(this.cwd, "Library", "LaunchAgents");
+  await Deno.mkdir(agentsDir, { recursive: true });
+  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.daily.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.weekly.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
 });
 
 Given("no backup scheduled jobs are installed", async function (this: ZenWorld) {
   await ensureInstalled(this);
-  await Deno.remove(join(this.backupDir, ".scheduler-installed")).catch(() => undefined);
+  const agentsDir = join(this.cwd, "Library", "LaunchAgents");
+  await Deno.remove(join(agentsDir, "com.zen-backup.daily.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, "com.zen-backup.weekly.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, ".zen-backup-loaded")).catch(() => undefined);
 });
 
 Given("the backup tool is installed", async function (this: ZenWorld) {
   await ensureInstalled(this);
+  await runCli(["install"], {
+    cwd: this.cwd,
+    os: "darwin",
+    env: {
+      ...this.env,
+      HOME: this.cwd,
+      ZEN_BACKUP_PROFILE_PATH: this.profileDir,
+    },
+  });
 });
 
 Given("settings.toml contains:", async function (this: ZenWorld, table: DataTable) {

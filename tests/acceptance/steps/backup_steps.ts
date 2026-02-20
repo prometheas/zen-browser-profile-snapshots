@@ -62,23 +62,27 @@ Given("a backup directory exists at the configured path", async function (this: 
 });
 
 Given("cloud sync is configured to a valid path", async function (this: ZenWorld) {
+  await ensureBackupWorkspace(this);
   this.cloudPath = join(this.cwd, "cloud-backups");
   await Deno.mkdir(this.cloudPath, { recursive: true });
   await writeConfig(this, this.profileDir, this.backupDir, this.cloudPath);
 });
 
 Given("cloud sync is not configured", async function (this: ZenWorld) {
+  await ensureBackupWorkspace(this);
   this.cloudPath = undefined;
   await writeConfig(this, this.profileDir, this.backupDir, undefined);
 });
 
 Given("cloud sync is configured to an inaccessible path", async function (this: ZenWorld) {
+  await ensureBackupWorkspace(this);
   this.cloudPath = join(this.cwd, "cloud-not-a-directory");
   await Deno.writeTextFile(this.cloudPath, "not a directory");
   await writeConfig(this, this.profileDir, this.backupDir, this.cloudPath);
 });
 
 When("a daily backup is created", async function (this: ZenWorld) {
+  await ensureBackupWorkspace(this);
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
     os: "darwin",
@@ -96,6 +100,7 @@ When("a daily backup is created", async function (this: ZenWorld) {
 });
 
 When("a weekly backup is created", async function (this: ZenWorld) {
+  await ensureBackupWorkspace(this);
   const result = await runCli(["backup", "weekly"], {
     cwd: this.cwd,
     os: "darwin",
@@ -300,6 +305,18 @@ async function writeConfig(
     configPath,
     `[profile]\npath = "${profilePath}"\n\n[backup]\nlocal_path = "${backupPath}"\n${cloudLine}`,
   );
+}
+
+async function ensureBackupWorkspace(world: ZenWorld): Promise<void> {
+  if (!world.profileDir) {
+    world.profileDir = join(world.cwd, "profile");
+  }
+  if (!world.backupDir) {
+    world.backupDir = join(world.cwd, "backups");
+  }
+  await Deno.mkdir(world.profileDir, { recursive: true });
+  await Deno.mkdir(world.backupDir, { recursive: true });
+  await writeConfig(world, world.profileDir, world.backupDir, world.cloudPath);
 }
 
 function extractArchivePath(stdout: string): string {
