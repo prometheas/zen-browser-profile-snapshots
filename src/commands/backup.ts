@@ -1,4 +1,4 @@
-import { join } from "jsr:@std/path@1.1.4";
+import { basename, join } from "jsr:@std/path@1.1.4";
 import { createProfileArchive } from "../archive.ts";
 import { loadConfig } from "../config.ts";
 import { nextArchivePath } from "../core/archive_naming.ts";
@@ -42,10 +42,25 @@ export async function runBackup(
       await appendLog(config.backup.local_path, "WARNING", warning);
     }
 
+    let partialFailure = false;
+    if (config.backup.cloud_path) {
+      try {
+        const cloudKindDir = join(config.backup.cloud_path, kind);
+        await Deno.mkdir(cloudKindDir, { recursive: true });
+        const cloudArchivePath = join(cloudKindDir, basename(archivePath));
+        await Deno.copyFile(archivePath, cloudArchivePath);
+      } catch (error) {
+        partialFailure = true;
+        const message = error instanceof Error ? error.message : String(error);
+        await appendLog(config.backup.local_path, "ERROR", `cloud sync failed: ${message}`);
+        stderr.push(`cloud sync failed: ${message}`);
+      }
+    }
+
     await appendLog(config.backup.local_path, "SUCCESS", `created ${kind} backup ${archivePath}`);
     stdout.push(`Created ${kind} backup: ${archivePath}`);
 
-    return { exitCode: 0, stdout, stderr };
+    return { exitCode: partialFailure ? 1 : 0, stdout, stderr };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     stderr.push(message);
