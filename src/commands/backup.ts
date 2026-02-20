@@ -30,6 +30,7 @@ export async function runBackup(
         enabled: config.notifications.enabled,
         title: "Zen Backup Error",
         message: `profile path not found: ${config.profile.path}`,
+        env: options.env,
       });
       throw new CliError(`profile path not found: ${config.profile.path}`, "ERR_PROFILE_NOT_FOUND", 1);
     }
@@ -44,6 +45,7 @@ export async function runBackup(
         enabled: config.notifications.enabled,
         title: "Zen Backup",
         message,
+        env: options.env,
       });
     }
 
@@ -90,6 +92,7 @@ export async function runBackup(
           enabled: config.notifications.enabled,
           title: "Zen Backup Warning",
           message: `cloud sync failed: ${message}`,
+          env: options.env,
         });
         stderr.push(`cloud sync failed: ${message}`);
       }

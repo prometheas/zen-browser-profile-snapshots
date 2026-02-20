@@ -53,11 +53,36 @@ export async function runInstall(options: RuntimeOptions = {}): Promise<{
       stdout.push("Scheduler installed.");
       stdout.push(...scheduler.labels);
     }
+
+    if (os === "darwin") {
+      const hasTerminalNotifier = await executableExists("terminal-notifier", options.env);
+      if (!hasTerminalNotifier) {
+        stderr.push(
+          "Optional: install `terminal-notifier` for improved native notifications (fallback to osascript is used).",
+        );
+      }
+    }
     return { exitCode: 0, stdout, stderr };
   } catch (error) {
     stderr.push(error instanceof Error ? error.message : String(error));
     return { exitCode: 1, stdout, stderr };
   }
+}
+
+async function executableExists(
+  name: string,
+  env?: Record<string, string | undefined>,
+): Promise<boolean> {
+  if (env?.ZEN_BACKUP_FORCE_NO_TERMINAL_NOTIFIER === "1" && name === "terminal-notifier") {
+    return false;
+  }
+  const probe = await new Deno.Command("sh", {
+    args: ["-lc", `command -v ${name}`],
+    env: env ? Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<string, string> : undefined,
+    stdout: "null",
+    stderr: "null",
+  }).output();
+  return probe.success;
 }
 
 async function detectProfilePath(options: RuntimeOptions): Promise<string | null> {

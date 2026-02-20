@@ -10,11 +10,12 @@ Deno.test("install writes config and macOS launchd plists", async () => {
   const result = await runCli(["install"], {
     cwd: tempDir,
     os: "darwin",
-    env: { HOME: tempDir },
+    env: { HOME: tempDir, ZEN_BACKUP_FORCE_NO_TERMINAL_NOTIFIER: "1" },
   });
 
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "Detected profile path");
+  assertStringIncludes(result.stderr, "terminal-notifier");
 
   const configPath = join(tempDir, ".config", "zen-profile-backup", "settings.toml");
   const dailyPlist = join(tempDir, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist");
