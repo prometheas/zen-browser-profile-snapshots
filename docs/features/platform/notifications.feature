@@ -91,7 +91,7 @@ Feature: Notifications
 
   # Notifications can be disabled
   Scenario: No notification when notifications are disabled
-    Given notifications are disabled in configuration
+    Given notifications are disabled in configuration (notifications.enabled = false)
     And a Zen browser process is running
     When a daily backup is created
     Then no notification is displayed

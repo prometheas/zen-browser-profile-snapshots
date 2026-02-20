@@ -10,7 +10,7 @@ Feature: Scheduling
     Given the backup tool is installed
     When the scheduler is queried
     Then a launchd agent "com.zen-backup.daily" is loaded
-    And the agent is configured to run at 12:30 daily
+    And the agent is configured to run at the configured daily_time (default: 12:30)
 
   @macos
   Scenario: Daily launchd agent fires backup command
@@ -24,7 +24,7 @@ Feature: Scheduling
     Given the backup tool is installed
     When the scheduler is queried
     Then a systemd user timer "zen-backup-daily.timer" is active
-    And the timer is configured to run at 12:30 daily
+    And the timer is configured to run at the configured daily_time (default: 12:30)
 
   @linux
   Scenario: Daily systemd timer fires backup command
@@ -38,7 +38,7 @@ Feature: Scheduling
     Given the backup tool is installed
     When the scheduler is queried
     Then a scheduled task "ZenBackupDaily" exists
-    And the task is configured to run at 12:30 daily
+    And the task is configured to run at the configured daily_time (default: 12:30)
 
   @windows
   Scenario: Daily Task Scheduler task fires backup command
@@ -53,21 +53,21 @@ Feature: Scheduling
     Given the backup tool is installed
     When the scheduler is queried
     Then a launchd agent "com.zen-backup.weekly" is loaded
-    And the agent is configured to run at 02:00 every Sunday
+    And the agent is configured to run at the configured weekly_day and weekly_time (default: Sunday 02:00)
 
   @linux
   Scenario: Weekly backup scheduled via systemd timer
     Given the backup tool is installed
     When the scheduler is queried
     Then a systemd user timer "zen-backup-weekly.timer" is active
-    And the timer is configured to run at 02:00 every Sunday
+    And the timer is configured to run at the configured weekly_day and weekly_time (default: Sunday 02:00)
 
   @windows
   Scenario: Weekly backup scheduled via Task Scheduler
     Given the backup tool is installed
     When the scheduler is queried
     Then a scheduled task "ZenBackupWeekly" exists
-    And the task is configured to run at 02:00 every Sunday
+    And the task is configured to run at the configured weekly_day and weekly_time (default: Sunday 02:00)
 
   # Scheduler queries for status
   @macos
@@ -127,7 +127,8 @@ Feature: Scheduling
   Scenario Outline: Scheduled backup output is logged
     Given the backup tool is installed on <platform>
     When a scheduled daily backup runs
-    Then stdout and stderr are captured to a log file
+    Then stdout and stderr are captured to "backup.log"
+    And on Linux the output is also available in the systemd journal
 
     Examples:
       | platform |

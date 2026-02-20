@@ -8,7 +8,7 @@
 **So that** I don't have to remember to back up my profile manually
 
 **Acceptance criteria:**
-- A scheduled task fires a daily backup at a configurable time (default: 12:30)
+- A scheduled task fires a daily backup at a configurable time (default: 12:30, local time)
 - The backup runs without any user interaction
 - Output is written to a log file
 - Works via native OS scheduler: launchd (macOS), systemd timer (Linux), Task Scheduler (Windows)
@@ -21,7 +21,7 @@
 **So that** I have long-term snapshots I can roll back to weeks later
 
 **Acceptance criteria:**
-- A scheduled task fires a weekly backup at a configurable time (default: 02:00 Sunday)
+- A scheduled task fires a weekly backup at a configurable time (default: 02:00 Sunday, local time)
 - The backup is stored separately from daily archives
 - Output is written to a log file
 - Works via native OS scheduler: launchd (macOS), systemd timer (Linux), Task Scheduler (Windows)
@@ -281,6 +281,7 @@
 - The notification explains that SQLite databases are safe but session files may be mid-write
 - The backup continues and completes despite the warning
 - Notification method: osascript (macOS), notify-send (Linux), PowerShell toast (Windows)
+ - Notifications can be disabled via configuration
 
 ---
 
@@ -312,7 +313,7 @@
   - macOS: `~/.config/zen-profile-backup/settings.toml`
   - Linux: `~/.config/zen-profile-backup/settings.toml`
   - Windows: `%APPDATA%\zen-profile-backup\settings.toml`
-- It supports sections `[profile]`, `[backup]`, and `[retention]`
+- It supports sections `[profile]`, `[backup]`, `[retention]`, `[schedule]`, and `[notifications]`
 - Tilde (`~`) and environment variables in path values are expanded
 - Quoted and unquoted values are both handled correctly
 

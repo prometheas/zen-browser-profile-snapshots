@@ -22,6 +22,14 @@ Feature: Configuration
       [retention]
       daily_days = 30
       weekly_days = 84
+
+      [schedule]
+      daily_time = "12:30"
+      weekly_day = "Sunday"
+      weekly_time = "02:00"
+
+      [notifications]
+      enabled = true
       """
     When a backup command is run
     Then the backup uses the configured profile path
@@ -57,6 +65,28 @@ Feature: Configuration
     When the configuration is loaded
     Then retention.daily_days equals 14
     And retention.weekly_days equals 56
+
+  Scenario: Schedule section is parsed correctly
+    Given a config file containing:
+      """
+      [schedule]
+      daily_time = "09:15"
+      weekly_day = "Saturday"
+      weekly_time = "01:30"
+      """
+    When the configuration is loaded
+    Then schedule.daily_time equals "09:15"
+    And schedule.weekly_day equals "Saturday"
+    And schedule.weekly_time equals "01:30"
+
+  Scenario: Notifications section is parsed correctly
+    Given a config file containing:
+      """
+      [notifications]
+      enabled = false
+      """
+    When the configuration is loaded
+    Then notifications.enabled equals false
 
   Scenario: Tilde is expanded to home directory
     Given a config file containing:
