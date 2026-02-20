@@ -1,0 +1,136 @@
+@platform
+Feature: Scheduling
+  As a Zen browser user
+  I want automatic backups to run on a schedule
+  So that I don't have to remember to back up my profile manually
+
+  # US-01: Automatic Daily Backups
+  @macos
+  Scenario: Daily backup scheduled via launchd
+    Given the backup tool is installed
+    When the scheduler is queried
+    Then a launchd agent "com.zen-backup.daily" is loaded
+    And the agent is configured to run at 12:30 daily
+
+  @macos
+  Scenario: Daily launchd agent fires backup command
+    Given the launchd agent "com.zen-backup.daily" is loaded
+    When the scheduled time 12:30 is reached
+    Then a daily backup archive is created
+    And output is written to the log file
+
+  @linux
+  Scenario: Daily backup scheduled via systemd timer
+    Given the backup tool is installed
+    When the scheduler is queried
+    Then a systemd user timer "zen-backup-daily.timer" is active
+    And the timer is configured to run at 12:30 daily
+
+  @linux
+  Scenario: Daily systemd timer fires backup command
+    Given the systemd timer "zen-backup-daily.timer" is active
+    When the scheduled time 12:30 is reached
+    Then a daily backup archive is created
+    And output is written to the journal
+
+  @windows
+  Scenario: Daily backup scheduled via Task Scheduler
+    Given the backup tool is installed
+    When the scheduler is queried
+    Then a scheduled task "ZenBackupDaily" exists
+    And the task is configured to run at 12:30 daily
+
+  @windows
+  Scenario: Daily Task Scheduler task fires backup command
+    Given the scheduled task "ZenBackupDaily" exists
+    When the scheduled time 12:30 is reached
+    Then a daily backup archive is created
+    And output is written to the log file
+
+  # US-02: Automatic Weekly Backups
+  @macos
+  Scenario: Weekly backup scheduled via launchd
+    Given the backup tool is installed
+    When the scheduler is queried
+    Then a launchd agent "com.zen-backup.weekly" is loaded
+    And the agent is configured to run at 02:00 every Sunday
+
+  @linux
+  Scenario: Weekly backup scheduled via systemd timer
+    Given the backup tool is installed
+    When the scheduler is queried
+    Then a systemd user timer "zen-backup-weekly.timer" is active
+    And the timer is configured to run at 02:00 every Sunday
+
+  @windows
+  Scenario: Weekly backup scheduled via Task Scheduler
+    Given the backup tool is installed
+    When the scheduler is queried
+    Then a scheduled task "ZenBackupWeekly" exists
+    And the task is configured to run at 02:00 every Sunday
+
+  # Scheduler queries for status
+  @macos
+  Scenario: Status shows loaded launchd agents
+    Given the launchd agents are loaded
+    When the status command is run
+    Then stdout lists "com.zen-backup.daily"
+    And stdout lists "com.zen-backup.weekly"
+
+  @macos
+  Scenario: Status shows when no launchd agents are loaded
+    Given no launchd agents are loaded
+    When the status command is run
+    Then stdout contains "No scheduled jobs" or "not loaded"
+
+  @linux
+  Scenario: Status shows active systemd timers
+    Given the systemd timers are active
+    When the status command is run
+    Then stdout lists "zen-backup-daily.timer"
+    And stdout lists "zen-backup-weekly.timer"
+
+  @linux
+  Scenario: Status shows when no systemd timers are active
+    Given no systemd timers are active
+    When the status command is run
+    Then stdout contains "No scheduled jobs" or "not active"
+
+  @windows
+  Scenario: Status shows Task Scheduler tasks
+    Given the scheduled tasks exist
+    When the status command is run
+    Then stdout lists "ZenBackupDaily"
+    And stdout lists "ZenBackupWeekly"
+
+  @windows
+  Scenario: Status shows when no scheduled tasks exist
+    Given no scheduled tasks exist
+    When the status command is run
+    Then stdout contains "No scheduled jobs" or "not found"
+
+  # Backup runs without user interaction
+  Scenario Outline: Scheduled backup runs without user interaction
+    Given the backup tool is installed on <platform>
+    And no user is logged in interactively
+    When the scheduled backup time is reached
+    Then a backup archive is created
+    And no interactive prompts are displayed
+
+    Examples:
+      | platform |
+      | macos    |
+      | linux    |
+      | windows  |
+
+  # Log output
+  Scenario Outline: Scheduled backup output is logged
+    Given the backup tool is installed on <platform>
+    When a scheduled daily backup runs
+    Then stdout and stderr are captured to a log file
+
+    Examples:
+      | platform |
+      | macos    |
+      | linux    |
+      | windows  |
