@@ -282,7 +282,7 @@
 - If Zen is detected as running at the start of backup, a platform-native notification is displayed
 - The notification explains that SQLite databases are safe but session files may be mid-write
 - The backup continues and completes despite the warning
-- Notification method: terminal-notifier preferred on macOS, with osascript fallback; notify-send (Linux); PowerShell toast (Windows)
+- Notification method uses the platform-native notification mechanism
 - Notifications can be disabled via configuration
 
 ---
@@ -348,7 +348,6 @@
 - The user is prompted for a local backup directory (default: `~/zen-backups` or `%USERPROFILE%\zen-backups`)
 - The user selects or skips cloud sync
 - A valid `settings.toml` is written on completion
-- On macOS, if `terminal-notifier` is unavailable, install prints a recommendation to install it
 
 ---
 
