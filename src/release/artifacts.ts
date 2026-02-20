@@ -36,6 +36,17 @@ export function renderReleaseNotes(metadata: ReleaseMetadata, artifacts: BuiltAr
 Release date: ${metadata.date}
 Commit: ${metadata.commit}
 
+## Release Type
+- Alpha / technical preview for macOS users.
+
+## Included In This Alpha
+- Manual backup commands: \`backup daily\`, \`backup weekly\`
+- Restore command with pre-restore safety copy: \`restore <archive>\`
+- Snapshot visibility commands: \`list\`, \`status\`
+- Retention pruning for local and cloud backup directories
+- macOS install/uninstall flow with launchd plist generation
+- Release artifacts for Apple Silicon and Intel macOS binaries
+
 ## Artifacts
 ${artifactLines.join("\n")}
 
@@ -44,6 +55,12 @@ ${artifactLines.join("\n")}
 
 ## Smoke Validation
 - Each binary was executed with no arguments and returned CLI usage output.
+
+## Planned Before Stable
+- Harden native launchd lifecycle integration with real \`launchctl\` verification
+- Harden macOS native notification path (\`osascript\`) with fallback behavior
+- Additional restore safety tests and rollback guarantees for edge-case archives
+- Broader real-world smoke testing on clean Intel and Apple Silicon macOS systems
 `;
 }
 
