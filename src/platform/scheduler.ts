@@ -4,7 +4,11 @@ import type { AppConfig, Platform, RuntimeOptions } from "../types.ts";
 export interface SchedulerStatus {
   installed: boolean;
   labels: string[];
+  states: Record<string, "active" | "paused" | "not_installed">;
 }
+
+export const DAILY_LABEL = "com.prometheas.zen-backup.daily";
+export const WEEKLY_LABEL = "com.prometheas.zen-backup.weekly";
 
 export async function installScheduler(
   config: AppConfig,
@@ -14,7 +18,7 @@ export async function installScheduler(
   if (os === "darwin") {
     return await installLaunchd(config, options);
   }
-  return { installed: false, labels: [] };
+  return { installed: false, labels: [], states: {} };
 }
 
 export async function uninstallScheduler(options: RuntimeOptions = {}): Promise<SchedulerStatus> {
@@ -22,7 +26,39 @@ export async function uninstallScheduler(options: RuntimeOptions = {}): Promise<
   if (os === "darwin") {
     return await uninstallLaunchd(options);
   }
-  return { installed: false, labels: [] };
+  return { installed: false, labels: [], states: {} };
+}
+
+export async function startScheduler(options: RuntimeOptions = {}): Promise<SchedulerStatus> {
+  const os = options.os ?? (Deno.build.os as Platform);
+  if (os !== "darwin") return { installed: false, labels: [], states: {} };
+
+  const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
+  const dailyPlist = join(agentsDir, `${DAILY_LABEL}.plist`);
+  const weeklyPlist = join(agentsDir, `${WEEKLY_LABEL}.plist`);
+  const hasPlists = await exists(dailyPlist) && await exists(weeklyPlist);
+  if (!hasPlists) return await queryLaunchd(options);
+
+  await Deno.remove(join(agentsDir, `.disabled-${DAILY_LABEL}`)).catch(() => undefined);
+  await Deno.remove(join(agentsDir, `.disabled-${WEEKLY_LABEL}`)).catch(() => undefined);
+  await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
+  return await queryLaunchd(options);
+}
+
+export async function stopScheduler(options: RuntimeOptions = {}): Promise<SchedulerStatus> {
+  const os = options.os ?? (Deno.build.os as Platform);
+  if (os !== "darwin") return { installed: false, labels: [], states: {} };
+
+  const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
+  const dailyPlist = join(agentsDir, `${DAILY_LABEL}.plist`);
+  const weeklyPlist = join(agentsDir, `${WEEKLY_LABEL}.plist`);
+  const hasPlists = await exists(dailyPlist) && await exists(weeklyPlist);
+  if (!hasPlists) return await queryLaunchd(options);
+
+  await Deno.writeTextFile(join(agentsDir, `.disabled-${DAILY_LABEL}`), "1");
+  await Deno.writeTextFile(join(agentsDir, `.disabled-${WEEKLY_LABEL}`), "1");
+  await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
+  return await queryLaunchd(options);
 }
 
 export async function queryScheduler(options: RuntimeOptions = {}): Promise<SchedulerStatus> {
@@ -30,19 +66,19 @@ export async function queryScheduler(options: RuntimeOptions = {}): Promise<Sche
   if (os === "darwin") {
     return await queryLaunchd(options);
   }
-  return { installed: false, labels: [] };
+  return { installed: false, labels: [], states: {} };
 }
 
 async function installLaunchd(config: AppConfig, options: RuntimeOptions): Promise<SchedulerStatus> {
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
   await Deno.mkdir(agentsDir, { recursive: true });
 
-  const dailyPath = join(agentsDir, "com.zen-backup.daily.plist");
-  const weeklyPath = join(agentsDir, "com.zen-backup.weekly.plist");
+  const dailyPath = join(agentsDir, `${DAILY_LABEL}.plist`);
+  const weeklyPath = join(agentsDir, `${WEEKLY_LABEL}.plist`);
   await Deno.writeTextFile(
     dailyPath,
     launchdTemplate({
-      label: "com.zen-backup.daily",
+      label: DAILY_LABEL,
       kind: "daily",
       hour: hourFromTime(config.schedule.daily_time),
       minute: minuteFromTime(config.schedule.daily_time),
@@ -52,7 +88,7 @@ async function installLaunchd(config: AppConfig, options: RuntimeOptions): Promi
   await Deno.writeTextFile(
     weeklyPath,
     launchdTemplate({
-      label: "com.zen-backup.weekly",
+      label: WEEKLY_LABEL,
       kind: "weekly",
       hour: hourFromTime(config.schedule.weekly_time),
       minute: minuteFromTime(config.schedule.weekly_time),
@@ -61,26 +97,54 @@ async function installLaunchd(config: AppConfig, options: RuntimeOptions): Promi
     }),
   );
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
-  return { installed: true, labels: ["com.zen-backup.daily", "com.zen-backup.weekly"] };
+  await Deno.remove(join(agentsDir, `.disabled-${DAILY_LABEL}`)).catch(() => undefined);
+  await Deno.remove(join(agentsDir, `.disabled-${WEEKLY_LABEL}`)).catch(() => undefined);
+  return {
+    installed: true,
+    labels: [DAILY_LABEL, WEEKLY_LABEL],
+    states: {
+      [DAILY_LABEL]: "active",
+      [WEEKLY_LABEL]: "active",
+    },
+  };
 }
 
 async function uninstallLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
-  await Deno.remove(join(agentsDir, "com.zen-backup.daily.plist")).catch(() => undefined);
-  await Deno.remove(join(agentsDir, "com.zen-backup.weekly.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, `${DAILY_LABEL}.plist`)).catch(() => undefined);
+  await Deno.remove(join(agentsDir, `${WEEKLY_LABEL}.plist`)).catch(() => undefined);
   await Deno.remove(join(agentsDir, ".zen-backup-loaded")).catch(() => undefined);
-  return { installed: false, labels: [] };
+  await Deno.remove(join(agentsDir, `.disabled-${DAILY_LABEL}`)).catch(() => undefined);
+  await Deno.remove(join(agentsDir, `.disabled-${WEEKLY_LABEL}`)).catch(() => undefined);
+  return {
+    installed: false,
+    labels: [],
+    states: {
+      [DAILY_LABEL]: "not_installed",
+      [WEEKLY_LABEL]: "not_installed",
+    },
+  };
 }
 
 async function queryLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
-  const daily = join(agentsDir, "com.zen-backup.daily.plist");
-  const weekly = join(agentsDir, "com.zen-backup.weekly.plist");
+  const daily = join(agentsDir, `${DAILY_LABEL}.plist`);
+  const weekly = join(agentsDir, `${WEEKLY_LABEL}.plist`);
   const loadedMarker = join(agentsDir, ".zen-backup-loaded");
-  const installed = await exists(daily) && await exists(weekly) && await exists(loadedMarker);
+  const dailyInstalled = await exists(daily);
+  const weeklyInstalled = await exists(weekly);
+  const loaded = await exists(loadedMarker);
+  const dailyPaused = await exists(join(agentsDir, `.disabled-${DAILY_LABEL}`));
+  const weeklyPaused = await exists(join(agentsDir, `.disabled-${WEEKLY_LABEL}`));
+  const installed = dailyInstalled && weeklyInstalled && loaded;
+
+  const states: Record<string, "active" | "paused" | "not_installed"> = {};
+  states[DAILY_LABEL] = !dailyInstalled ? "not_installed" : dailyPaused ? "paused" : "active";
+  states[WEEKLY_LABEL] = !weeklyInstalled ? "not_installed" : weeklyPaused ? "paused" : "active";
   return {
     installed,
-    labels: installed ? ["com.zen-backup.daily", "com.zen-backup.weekly"] : [],
+    labels: dailyInstalled || weeklyInstalled ? [DAILY_LABEL, WEEKLY_LABEL] : [],
+    states,
   };
 }
 
