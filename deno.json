@@ -14,7 +14,7 @@
     "test:unit": "deno test -A tests/unit",
     "test:integration": "deno test -A tests/integration",
     "test:acceptance": "deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts docs/features/**/*.feature",
-    "test:acceptance:m1": "deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts --name 'Status shows \"Not installed\" when settings.toml is missing|Config path can be overridden via environment variable|Create a daily backup manually|Create a weekly backup manually|Error when profile directory does not exist' docs/features/status.feature docs/features/core/configuration.feature docs/features/core/backup.feature",
+    "test:acceptance:m1": "deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts --name 'Status shows \"Not installed\" when settings.toml is missing|Config path can be overridden via environment variable|Create a daily backup manually|Create a weekly backup manually|Error when profile directory does not exist|SQLite databases are backed up safely|WAL and SHM files are not included in archive|Fallback when database is exclusively locked' docs/features/status.feature docs/features/core/configuration.feature docs/features/core/backup.feature",
     "test": "deno task test:unit && deno task test:integration",
     "typecheck": "deno check src/main.ts tests/unit/**/*.ts tests/integration/**/*.ts tests/acceptance/**/*.ts",
     "lint": "deno lint src tests",

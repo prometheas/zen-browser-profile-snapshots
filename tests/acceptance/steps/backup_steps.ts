@@ -1,9 +1,28 @@
-import { Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
-import { assert, assertEquals, assertMatch, assertStringIncludes } from "jsr:@std/assert@1.0.19";
+import { After, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
+import {
+  assert,
+  assertEquals,
+  assertMatch,
+  assertStringIncludes,
+} from "jsr:@std/assert@1.0.19";
 import { DataTable } from "npm:@cucumber/cucumber@12.6.0";
 import { dirname, join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../../src/main.ts";
 import { ZenWorld } from "../support/world.ts";
+
+After(async function (this: ZenWorld) {
+  if (this.sqliteLockWriter) {
+    const encoder = new TextEncoder();
+    await this.sqliteLockWriter.write(encoder.encode("ROLLBACK;\n.quit\n")).catch(() => undefined);
+    this.sqliteLockWriter.releaseLock();
+    this.sqliteLockWriter = null;
+  }
+
+  if (this.sqliteLockProcess) {
+    await this.sqliteLockProcess.status.catch(() => undefined);
+    this.sqliteLockProcess = null;
+  }
+});
 
 Given("a profile directory containing:", async function (this: ZenWorld, table: DataTable) {
   this.profileDir = join(this.cwd, "profile");
@@ -15,12 +34,24 @@ Given("a profile directory containing:", async function (this: ZenWorld, table: 
   for (const row of rows) {
     const path = row.file;
     const content = row.content;
-    const fullPath = join(this.profileDir, path);
-    await Deno.mkdir(dirname(fullPath), { recursive: true });
-    await Deno.writeTextFile(fullPath, content);
+    await writeProfileFixture(this.profileDir, path, content);
   }
 
   await writeConfig(this, this.profileDir, this.backupDir);
+});
+
+Given("the profile directory additionally contains:", async function (this: ZenWorld, table: DataTable) {
+  if (!this.profileDir) {
+    this.profileDir = join(this.cwd, "profile");
+    await Deno.mkdir(this.profileDir, { recursive: true });
+  }
+
+  const rows = table.hashes();
+  for (const row of rows) {
+    const path = row.file;
+    const content = row.content;
+    await writeProfileFixture(this.profileDir, path, content);
+  }
 });
 
 Given("a backup directory exists at the configured path", async function (this: ZenWorld) {
@@ -62,10 +93,34 @@ When("a weekly backup is created", async function (this: ZenWorld) {
   this.lastArchivePath = extractArchivePath(result.stdout);
 });
 
+When("the archive is extracted to a temporary directory", async function (this: ZenWorld) {
+  this.extractedDir = await Deno.makeTempDir({ prefix: "zen-backup-extracted-" });
+  await extractArchive(this.lastArchivePath, this.extractedDir);
+});
+
 Given("the configured profile path does not exist", async function (this: ZenWorld) {
   this.missingProfilePath = join(this.cwd, "missing-profile");
   this.backupDir = join(this.cwd, "backups");
   await writeConfig(this, this.missingProfilePath, this.backupDir);
+});
+
+Given("{string} is exclusively locked by another process", async function (this: ZenWorld, file: string) {
+  const dbPath = join(this.profileDir, file);
+  const lockProc = new Deno.Command("sqlite3", {
+    args: [dbPath],
+    stdin: "piped",
+    stdout: "null",
+    stderr: "null",
+  }).spawn();
+
+  const writer = lockProc.stdin.getWriter();
+  const encoder = new TextEncoder();
+  await writer.write(
+    encoder.encode("PRAGMA locking_mode=EXCLUSIVE;\nBEGIN EXCLUSIVE;\nSELECT 1;\n"),
+  );
+
+  this.sqliteLockProcess = lockProc;
+  this.sqliteLockWriter = writer;
 });
 
 When("a daily backup is attempted", async function (this: ZenWorld) {
@@ -104,6 +159,12 @@ Then("the archive is in the {string} subdirectory", function (this: ZenWorld, su
   assertStringIncludes(this.lastArchivePath, `/${subdirectory}/`);
 });
 
+Then("the archive contains {string}", async function (this: ZenWorld, path: string) {
+  const entries = await listArchive(this.lastArchivePath);
+  const joined = entries.join("\n");
+  assertStringIncludes(joined, path);
+});
+
 Then("stderr contains the missing path", function (this: ZenWorld) {
   assertStringIncludes(this.stderr, this.missingProfilePath);
 });
@@ -119,6 +180,43 @@ Then("no archive is created", async function (this: ZenWorld) {
   } catch {
     // Directory absence is also valid.
   }
+});
+
+Then(
+  "{string} in the extracted archive passes {string}",
+  async function (this: ZenWorld, path: string, _pragma: string) {
+    if (!this.extractedDir) {
+      this.extractedDir = await Deno.makeTempDir({ prefix: "zen-backup-extracted-" });
+      await extractArchive(this.lastArchivePath, this.extractedDir);
+    }
+    const dbPath = join(this.extractedDir, path);
+    const output = await sqliteQuery(dbPath, "PRAGMA integrity_check;");
+    assertStringIncludes(output.toLowerCase(), "ok");
+  },
+);
+
+Then(
+  "{string} in the extracted archive contains table {string}",
+  async function (this: ZenWorld, path: string, table: string) {
+    const dbPath = join(this.extractedDir, path);
+    const output = await sqliteQuery(
+      dbPath,
+      "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;",
+    );
+    assertStringIncludes(output, table);
+  },
+);
+
+Then("the extracted archive does not contain {string}", async function (this: ZenWorld, path: string) {
+  const entries = await listArchive(this.lastArchivePath);
+  const joined = entries.join("\n");
+  assertEquals(joined.includes(path), false);
+});
+
+Then("the log contains {string} or {string}", async function (this: ZenWorld, a: string, b: string) {
+  const logPath = join(this.backupDir, "backup.log");
+  const content = await Deno.readTextFile(logPath);
+  assert(content.includes(a) || content.includes(b), `expected log to include ${a} or ${b}`);
 });
 
 async function writeConfig(world: ZenWorld, profilePath: string, backupPath: string): Promise<void> {
@@ -139,4 +237,86 @@ function extractArchivePath(stdout: string): string {
 
   assertMatch(path, /\.tar\.gz$/);
   return path;
+}
+
+async function listArchive(archivePath: string): Promise<string[]> {
+  const command = new Deno.Command("tar", {
+    args: ["-tzf", archivePath],
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const output = await command.output();
+  if (!output.success) {
+    throw new Error(new TextDecoder().decode(output.stderr));
+  }
+  const text = new TextDecoder().decode(output.stdout).trim();
+  return text ? text.split("\n") : [];
+}
+
+async function extractArchive(archivePath: string, destination: string): Promise<void> {
+  const cmd = new Deno.Command("tar", {
+    args: ["-xzf", archivePath, "-C", destination],
+    stdout: "null",
+    stderr: "piped",
+  });
+  const out = await cmd.output();
+  if (!out.success) {
+    throw new Error(new TextDecoder().decode(out.stderr));
+  }
+}
+
+async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
+  const cmd = new Deno.Command("sqlite3", {
+    args: [dbPath, sql],
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const out = await cmd.output();
+  if (!out.success) {
+    throw new Error(new TextDecoder().decode(out.stderr));
+  }
+  return new TextDecoder().decode(out.stdout);
+}
+
+async function writeProfileFixture(profileDir: string, relativePath: string, content: string): Promise<void> {
+  const fullPath = join(profileDir, relativePath);
+  await Deno.mkdir(dirname(fullPath), { recursive: true });
+
+  if (relativePath.endsWith(".sqlite") || relativePath.endsWith(".db")) {
+    await seedSqliteFixture(fullPath, relativePath);
+    return;
+  }
+
+  await Deno.writeTextFile(fullPath, content);
+}
+
+async function seedSqliteFixture(dbPath: string, relativePath: string): Promise<void> {
+  if (relativePath.endsWith("places.sqlite")) {
+    await sqliteExec(
+      dbPath,
+      "CREATE TABLE IF NOT EXISTS moz_places(id INTEGER PRIMARY KEY, url TEXT);" +
+        "CREATE TABLE IF NOT EXISTS moz_bookmarks(id INTEGER PRIMARY KEY, place_id INTEGER);" +
+        "INSERT INTO moz_places(url) VALUES('https://example.com');" +
+        "INSERT INTO moz_bookmarks(place_id) VALUES(1);",
+    );
+    return;
+  }
+
+  await sqliteExec(
+    dbPath,
+    "CREATE TABLE IF NOT EXISTS sample(id INTEGER PRIMARY KEY, value TEXT);" +
+      "INSERT INTO sample(value) VALUES('ok');",
+  );
+}
+
+async function sqliteExec(dbPath: string, sql: string): Promise<void> {
+  const cmd = new Deno.Command("sqlite3", {
+    args: [dbPath, sql],
+    stdout: "null",
+    stderr: "piped",
+  });
+  const out = await cmd.output();
+  if (!out.success) {
+    throw new Error(new TextDecoder().decode(out.stderr));
+  }
 }

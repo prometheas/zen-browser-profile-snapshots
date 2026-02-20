@@ -12,6 +12,9 @@ export class ZenWorld extends World {
   backupDir = "";
   lastArchivePath = "";
   missingProfilePath = "";
+  extractedDir = "";
+  sqliteLockProcess: Deno.ChildProcess | null = null;
+  sqliteLockWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
 
   async initWorkspace(): Promise<void> {
     this.cwd = await Deno.makeTempDir();
