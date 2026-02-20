@@ -1,4 +1,5 @@
 import { runBackup } from "./commands/backup.ts";
+import { runList } from "./commands/list.ts";
 import { runStatus } from "./commands/status.ts";
 import type { RuntimeOptions } from "./types.ts";
 
@@ -21,6 +22,8 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
 
   if (args[0] === "status") {
     result = await runStatus(options);
+  } else if (args[0] === "list") {
+    result = await runList(options);
   } else if (args[0] === "backup") {
     const kind = args[1];
     if (kind !== "daily" && kind !== "weekly") {
