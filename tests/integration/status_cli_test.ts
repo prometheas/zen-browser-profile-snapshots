@@ -85,11 +85,15 @@ Deno.test("status reports active scheduled jobs marker and stale warning", async
   const backupDir = join(tempDir, "backups");
   const profileDir = join(tempDir, "profile");
   const configDir = join(tempDir, "custom");
+  const agentsDir = join(tempDir, "Library", "LaunchAgents");
   await Deno.mkdir(join(backupDir, "daily"), { recursive: true });
   await Deno.mkdir(profileDir, { recursive: true });
   await Deno.mkdir(configDir, { recursive: true });
+  await Deno.mkdir(agentsDir, { recursive: true });
   await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-01.tar.gz"), new Uint8Array(1024));
-  await Deno.writeTextFile(join(backupDir, ".scheduler-installed"), "1");
+  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.daily.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, "com.zen-backup.weekly.plist"), "<plist/>");
+  await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
     `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
@@ -108,4 +112,5 @@ Deno.test("status reports active scheduled jobs marker and stale warning", async
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "Warning: latest daily backup is stale.");
   assertStringIncludes(result.stdout, "Scheduled jobs: active");
+  assertStringIncludes(result.stdout, "com.zen-backup.daily");
 });

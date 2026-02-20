@@ -7,6 +7,7 @@ import {
   listArchives,
   newestArchive,
 } from "../core/archive_inventory.ts";
+import { queryScheduler } from "../platform/scheduler.ts";
 import type { RuntimeOptions } from "../types.ts";
 
 export async function runStatus(options: RuntimeOptions = {}): Promise<{ exitCode: number; stdout: string[]; stderr: string[] }> {
@@ -71,8 +72,15 @@ export async function runStatus(options: RuntimeOptions = {}): Promise<{ exitCod
       stdout.push(staleWarning);
     }
 
-    const schedulerInstalled = await exists(join(config.backup.local_path, ".scheduler-installed"));
-    stdout.push(schedulerInstalled ? "Scheduled jobs: active" : "Scheduled jobs: not installed");
+    const scheduler = await queryScheduler(options);
+    if (scheduler.installed) {
+      stdout.push("Scheduled jobs: active");
+      for (const label of scheduler.labels) {
+        stdout.push(`- ${label}`);
+      }
+    } else {
+      stdout.push("Scheduled jobs: not installed (not loaded)");
+    }
 
     return { exitCode: 0, stdout, stderr };
   } catch (error) {

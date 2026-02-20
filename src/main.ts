@@ -1,7 +1,9 @@
 import { runBackup } from "./commands/backup.ts";
+import { runInstall } from "./commands/install.ts";
 import { runList } from "./commands/list.ts";
 import { runRestore } from "./commands/restore.ts";
 import { runStatus } from "./commands/status.ts";
+import { runUninstall } from "./commands/uninstall.ts";
 import type { RuntimeOptions } from "./types.ts";
 
 export interface CliResult {
@@ -45,6 +47,10 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       };
     }
     result = await runRestore(archive, options);
+  } else if (args[0] === "install") {
+    result = await runInstall(options);
+  } else if (args[0] === "uninstall") {
+    result = await runUninstall(options);
   } else {
     result = {
       exitCode: 1,

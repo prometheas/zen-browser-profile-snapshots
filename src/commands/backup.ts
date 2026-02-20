@@ -5,6 +5,7 @@ import { nextArchivePath } from "../core/archive_naming.ts";
 import { pruneArchives } from "../core/retention.ts";
 import { CliError } from "../errors.ts";
 import { appendLog } from "../log.ts";
+import { notify } from "../platform/notifications.ts";
 import type { RuntimeOptions } from "../types.ts";
 
 export async function runBackup(
@@ -23,7 +24,27 @@ export async function runBackup(
     try {
       await Deno.stat(config.profile.path);
     } catch {
+      await notify({
+        backupRoot: config.backup.local_path,
+        os: options.os ?? (Deno.build.os as "darwin" | "linux" | "windows"),
+        enabled: config.notifications.enabled,
+        title: "Zen Backup Error",
+        message: `profile path not found: ${config.profile.path}`,
+      });
       throw new CliError(`profile path not found: ${config.profile.path}`, "ERR_PROFILE_NOT_FOUND", 1);
+    }
+
+    if (options.env?.ZEN_BACKUP_BROWSER_RUNNING === "1") {
+      const message =
+        "browser is running; SQLite databases are safely backed up, but session files may be mid-write";
+      await appendLog(config.backup.local_path, "WARNING", message);
+      await notify({
+        backupRoot: config.backup.local_path,
+        os: options.os ?? (Deno.build.os as "darwin" | "linux" | "windows"),
+        enabled: config.notifications.enabled,
+        title: "Zen Backup",
+        message,
+      });
     }
 
     const kindDir = join(config.backup.local_path, kind);
@@ -63,6 +84,13 @@ export async function runBackup(
         partialFailure = true;
         const message = error instanceof Error ? error.message : String(error);
         await appendLog(config.backup.local_path, "ERROR", `cloud sync failed: ${message}`);
+        await notify({
+          backupRoot: config.backup.local_path,
+          os: options.os ?? (Deno.build.os as "darwin" | "linux" | "windows"),
+          enabled: config.notifications.enabled,
+          title: "Zen Backup Warning",
+          message: `cloud sync failed: ${message}`,
+        });
         stderr.push(`cloud sync failed: ${message}`);
       }
     }
