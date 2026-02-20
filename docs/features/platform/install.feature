@@ -73,7 +73,7 @@ Feature: Install
 
   @windows
   Scenario: Google Drive detected on Windows
-    Given Google Drive is mounted at "G:\My Drive"
+    Given Google Drive is mounted at "%USERPROFILE%\\Google Drive\\My Drive"
     When the install command is run
     Then "Google Drive" appears as a cloud sync option
 

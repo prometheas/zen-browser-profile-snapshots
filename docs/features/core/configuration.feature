@@ -99,14 +99,14 @@ Feature: Configuration
     And backup.local_path ends with "zen-backups"
 
   Scenario: Environment variables in paths are expanded
-    Given the environment variable "ZEN_BACKUP_DIR" is set to "/custom/path"
+    Given the environment variable "ZEN_BACKUP_DIR" is set to "custom/path"
     And a config file containing:
       """
       [backup]
       local_path = "$ZEN_BACKUP_DIR/backups"
       """
     When the configuration is loaded
-    Then backup.local_path equals "/custom/path/backups"
+    Then backup.local_path equals "custom/path/backups"
 
   Scenario: Quoted values are handled correctly
     Given a config file containing:
@@ -128,8 +128,8 @@ Feature: Configuration
 
   # US-23: Overridable Config Path
   Scenario: Config path can be overridden via environment variable
-    Given the environment variable "ZEN_BACKUP_CONFIG" is set to "/custom/config.toml"
-    And a config file exists at "/custom/config.toml" containing:
+    Given the environment variable "ZEN_BACKUP_CONFIG" is set to "custom/config.toml"
+    And a config file exists at "custom/config.toml" containing:
       """
       [profile]
       path = "~/custom-profile"

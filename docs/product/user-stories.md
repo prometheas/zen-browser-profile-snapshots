@@ -327,7 +327,7 @@
 **So that** I can use different configs in test or multi-environment contexts
 
 **Acceptance criteria:**
-- Setting `ZEN_BACKUP_CONFIG=/path/to/custom.toml` causes the tool to read that file instead
+- Setting `ZEN_BACKUP_CONFIG=custom/config.toml` causes the tool to read that file instead
 - When the env var is unset, the default path is used
 
 ---
