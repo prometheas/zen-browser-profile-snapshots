@@ -6,7 +6,7 @@ Feature: Notifications
 
   # US-20: Notification When Backing Up With Browser Open
   @macos
-  Scenario: Warning notification via osascript when browser is running
+  Scenario: Warning notification via terminal-notifier or osascript when browser is running
     Given a Zen browser process is running
     When a daily backup is created
     Then a macOS notification is displayed with title "Zen Backup"
@@ -31,7 +31,7 @@ Feature: Notifications
 
   # Error notifications
   @macos
-  Scenario: Error notification via osascript when profile is missing
+  Scenario: Error notification via terminal-notifier or osascript when profile is missing
     Given the configured profile path does not exist
     When a daily backup is attempted
     Then a macOS notification is displayed with title "Zen Backup Error"
@@ -53,7 +53,7 @@ Feature: Notifications
 
   # Cloud sync error notifications
   @macos
-  Scenario: Error notification when cloud sync fails on macOS
+  Scenario: Error notification via terminal-notifier or osascript when cloud sync fails on macOS
     Given cloud sync is configured to an inaccessible path
     When a daily backup is created
     Then a macOS notification is displayed with title "Zen Backup Warning"

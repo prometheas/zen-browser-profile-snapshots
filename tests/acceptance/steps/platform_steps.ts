@@ -59,6 +59,10 @@ Given("the user enters a non-existent profile path", function (this: ZenWorld) {
   this.env.ZEN_BACKUP_VALIDATE_ONLY = "1";
 });
 
+Given("terminal-notifier is not installed", function (this: ZenWorld) {
+  this.env.ZEN_BACKUP_FORCE_NO_TERMINAL_NOTIFIER = "1";
+});
+
 Given("the launchd agent {string} is loaded", async function (this: ZenWorld, _label: string) {
   await ensurePlatformConfig(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");

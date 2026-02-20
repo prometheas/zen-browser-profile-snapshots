@@ -102,6 +102,12 @@ Feature: Install
     When the install command is run
     Then "None (local only)" appears as a cloud sync option
 
+  @macos
+  Scenario: Installer recommends terminal-notifier when unavailable
+    Given terminal-notifier is not installed
+    When the install command is run
+    Then stderr contains "terminal-notifier"
+
   Scenario: User can skip cloud sync
     Given the install command is running
     When the user selects "None (local only)"
