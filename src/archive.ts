@@ -1,4 +1,5 @@
 import { basename, dirname, join, normalize } from "jsr:@std/path@1.1.4";
+import { backupSqliteDatabase } from "./sqlite.ts";
 
 const EXCLUDED_EXACT_FILES = new Set([
   "cookies.sqlite",
@@ -18,11 +19,19 @@ const EXCLUDED_DIR_PREFIXES = [
   "storage/default/chrome/",
 ];
 
-export async function createProfileArchive(profilePath: string, archivePath: string): Promise<void> {
+export interface ArchiveCreationResult {
+  warnings: string[];
+}
+
+export async function createProfileArchive(
+  profilePath: string,
+  archivePath: string,
+): Promise<ArchiveCreationResult> {
   const stagingDir = await Deno.makeTempDir({ prefix: "zen-backup-staging-" });
+  const warnings: string[] = [];
 
   try {
-    await copyAllowedEntries(profilePath, stagingDir, "");
+    await copyAllowedEntries(profilePath, stagingDir, "", warnings);
     await Deno.mkdir(dirname(archivePath), { recursive: true });
 
     const command = new Deno.Command("tar", {
@@ -36,16 +45,24 @@ export async function createProfileArchive(profilePath: string, archivePath: str
       const errorText = new TextDecoder().decode(result.stderr);
       throw new Error(`archive creation failed: ${errorText.trim()}`);
     }
+
+    return { warnings };
   } finally {
     await Deno.remove(stagingDir, { recursive: true }).catch(() => undefined);
   }
 }
 
-async function copyAllowedEntries(sourceRoot: string, targetRoot: string, relativeDir: string): Promise<void> {
+async function copyAllowedEntries(
+  sourceRoot: string,
+  targetRoot: string,
+  relativeDir: string,
+  warnings: string[],
+): Promise<void> {
   const sourceDir = relativeDir ? join(sourceRoot, relativeDir) : sourceRoot;
 
   for await (const entry of Deno.readDir(sourceDir)) {
     const relativePath = normalize(join(relativeDir, entry.name)).replaceAll("\\", "/");
+    const fileName = basename(relativePath);
 
     if (!shouldInclude(relativePath, entry.isDirectory)) {
       continue;
@@ -56,7 +73,7 @@ async function copyAllowedEntries(sourceRoot: string, targetRoot: string, relati
 
     if (entry.isDirectory) {
       await Deno.mkdir(targetPath, { recursive: true });
-      await copyAllowedEntries(sourceRoot, targetRoot, relativePath);
+      await copyAllowedEntries(sourceRoot, targetRoot, relativePath, warnings);
       continue;
     }
 
@@ -65,6 +82,15 @@ async function copyAllowedEntries(sourceRoot: string, targetRoot: string, relati
     }
 
     await Deno.mkdir(dirname(targetPath), { recursive: true });
+
+    if (isSqliteFile(fileName)) {
+      const result = await backupSqliteDatabase(sourcePath, targetPath);
+      if (result.usedFallback) {
+        warnings.push(`fallback sqlite copy used for ${relativePath}`);
+      }
+      continue;
+    }
+
     await Deno.copyFile(sourcePath, targetPath);
   }
 }
@@ -96,4 +122,8 @@ export function shouldInclude(relativePath: string, isDirectory: boolean): boole
   }
 
   return true;
+}
+
+function isSqliteFile(fileName: string): boolean {
+  return fileName.endsWith(".sqlite") || fileName.endsWith(".db");
 }

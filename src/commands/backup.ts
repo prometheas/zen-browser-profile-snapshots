@@ -29,11 +29,17 @@ export async function runBackup(
     await Deno.mkdir(kindDir, { recursive: true });
 
     const archivePath = await nextArchivePath(kindDir, kind, new Date());
+    let archiveWarnings: string[] = [];
     try {
-      await createProfileArchive(config.profile.path, archivePath);
+      const archiveResult = await createProfileArchive(config.profile.path, archivePath);
+      archiveWarnings = archiveResult.warnings;
     } catch (error) {
       await Deno.remove(archivePath).catch(() => undefined);
       throw error;
+    }
+
+    for (const warning of archiveWarnings) {
+      await appendLog(config.backup.local_path, "WARNING", warning);
     }
 
     await appendLog(config.backup.local_path, "SUCCESS", `created ${kind} backup ${archivePath}`);
