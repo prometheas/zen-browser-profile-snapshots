@@ -4,6 +4,8 @@ Feature: Retention
   I want old backup archives automatically deleted
   So that backups don't accumulate and fill up my disk
 
+  # Retention uses the date encoded in the archive filename, not file mtime.
+
   # US-12: Automatic Daily Retention Enforcement
   Scenario: Daily archives older than retention period are deleted
     Given the configuration has "retention.daily_days = 7"

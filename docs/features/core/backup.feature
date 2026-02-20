@@ -28,6 +28,12 @@ Feature: Backup
     And the archive is in the "weekly" subdirectory
     And the exit code is 0
 
+  Scenario: Backup adds suffix when same-day archive already exists
+    Given a daily backup archive "zen-backup-daily-2026-01-15.tar.gz" already exists
+    When a daily backup is created
+    Then an archive exists matching pattern "zen-backup-daily-2026-01-15-2\.tar\.gz"
+    And the exit code is 0
+
   # US-05: Safe SQLite Backup
   Scenario: SQLite databases are backed up safely
     When a daily backup is created
