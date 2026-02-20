@@ -12,10 +12,10 @@ Given("the backup directory contains:", async function (this: ZenWorld, table: D
 
   for (const row of table.hashes()) {
     const subdirectory = row.subdirectory;
-    const file = row.file;
+    const file = row.file ?? `generated-${subdirectory}.tar.gz`;
     const path = join(this.backupDir, subdirectory, file);
     await Deno.mkdir(dirname(path), { recursive: true });
-    const bytes = row.size ? parseSize(row.size) : 128;
+    const bytes = row.size ? parseSize(row.size) : row.total_size ? parseSize(row.total_size) : 128;
     await Deno.writeFile(path, new Uint8Array(bytes));
   }
 
@@ -111,6 +111,7 @@ Then("stderr contains {string} or {string}", function (this: ZenWorld, a: string
 
 async function writeConfig(world: ZenWorld, profilePath: string, backupPath: string): Promise<void> {
   const configPath = world.resolvePath("custom/settings.toml");
+  world.env.ZEN_BACKUP_CONFIG = "custom/settings.toml";
   await Deno.mkdir(dirname(configPath), { recursive: true });
   await Deno.writeTextFile(
     configPath,

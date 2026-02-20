@@ -1,4 +1,5 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
+import { join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../src/main.ts";
 
 Deno.test("status shows not installed when config is missing", async () => {
@@ -42,4 +43,69 @@ Deno.test("backup command loads overridden config path", async () => {
 
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "Created daily backup");
+});
+
+Deno.test("status shows latest daily and weekly backups with disk usage", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const backupDir = join(tempDir, "backups");
+  const profileDir = join(tempDir, "profile");
+  const configDir = join(tempDir, "custom");
+  await Deno.mkdir(join(backupDir, "daily"), { recursive: true });
+  await Deno.mkdir(join(backupDir, "weekly"), { recursive: true });
+  await Deno.mkdir(profileDir, { recursive: true });
+  await Deno.mkdir(configDir, { recursive: true });
+  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-14.tar.gz"), new Uint8Array(2048));
+  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz"), new Uint8Array(3072));
+  await Deno.writeFile(join(backupDir, "weekly", "zen-backup-weekly-2026-01-12.tar.gz"), new Uint8Array(1024));
+  await Deno.writeTextFile(
+    join(configDir, "settings.toml"),
+    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+  );
+
+  const result = await runCli(["status"], {
+    cwd: tempDir,
+    os: "darwin",
+    now: new Date("2026-01-16T00:00:00Z"),
+    env: {
+      HOME: tempDir,
+      ZEN_BACKUP_CONFIG: "custom/settings.toml",
+    },
+  });
+
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stdout, "Latest daily: zen-backup-daily-2026-01-15.tar.gz");
+  assertStringIncludes(result.stdout, "Latest weekly: zen-backup-weekly-2026-01-12.tar.gz");
+  assertStringIncludes(result.stdout, "Disk usage total:");
+  assertStringIncludes(result.stdout, "Disk usage daily:");
+  assertStringIncludes(result.stdout, "Disk usage weekly:");
+});
+
+Deno.test("status reports active scheduled jobs marker and stale warning", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const backupDir = join(tempDir, "backups");
+  const profileDir = join(tempDir, "profile");
+  const configDir = join(tempDir, "custom");
+  await Deno.mkdir(join(backupDir, "daily"), { recursive: true });
+  await Deno.mkdir(profileDir, { recursive: true });
+  await Deno.mkdir(configDir, { recursive: true });
+  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-01.tar.gz"), new Uint8Array(1024));
+  await Deno.writeTextFile(join(backupDir, ".scheduler-installed"), "1");
+  await Deno.writeTextFile(
+    join(configDir, "settings.toml"),
+    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+  );
+
+  const result = await runCli(["status"], {
+    cwd: tempDir,
+    os: "darwin",
+    now: new Date("2026-01-20T00:00:00Z"),
+    env: {
+      HOME: tempDir,
+      ZEN_BACKUP_CONFIG: "custom/settings.toml",
+    },
+  });
+
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stdout, "Warning: latest daily backup is stale.");
+  assertStringIncludes(result.stdout, "Scheduled jobs: active");
 });

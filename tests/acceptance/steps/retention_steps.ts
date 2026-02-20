@@ -147,6 +147,7 @@ async function ensureWorkspace(world: ZenWorld): Promise<void> {
 
 async function writeConfig(world: ZenWorld): Promise<void> {
   const configPath = world.resolvePath("custom/settings.toml");
+  world.env.ZEN_BACKUP_CONFIG = "custom/settings.toml";
   await Deno.mkdir(dirname(configPath), { recursive: true });
   const daily = world.retentionDaily;
   const weekly = world.retentionWeekly;

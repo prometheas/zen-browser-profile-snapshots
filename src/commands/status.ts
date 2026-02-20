@@ -1,5 +1,12 @@
 import { join } from "jsr:@std/path@1.1.4";
 import { loadConfig } from "../config.ts";
+import {
+  archiveDate,
+  directorySize,
+  formatSize,
+  listArchives,
+  newestArchive,
+} from "../core/archive_inventory.ts";
 import type { RuntimeOptions } from "../types.ts";
 
 export async function runStatus(options: RuntimeOptions = {}): Promise<{ exitCode: number; stdout: string[]; stderr: string[] }> {
@@ -27,14 +34,45 @@ export async function runStatus(options: RuntimeOptions = {}): Promise<{ exitCod
       return { exitCode: 0, stdout, stderr };
     }
 
+    const canReadBackups = await isReadableDirectory(config.backup.local_path);
+    if (!canReadBackups.ok) {
+      stderr.push("Backup directory is not readable.");
+      return { exitCode: 1, stdout, stderr };
+    }
+
     const dailyDir = join(config.backup.local_path, "daily");
     const weeklyDir = join(config.backup.local_path, "weekly");
-    const latestDaily = await latestArchive(dailyDir);
-    const latestWeekly = await latestArchive(weeklyDir);
+    const archives = await listArchives(config.backup.local_path);
+    const latestDaily = newestArchive(archives, "daily");
+    const latestWeekly = newestArchive(archives, "weekly");
 
-    stdout.push(latestDaily ? `Latest daily: ${latestDaily}` : "No daily backups yet");
-    stdout.push(latestWeekly ? `Latest weekly: ${latestWeekly}` : "No weekly backups yet");
-    stdout.push("Scheduled jobs: not installed");
+    stdout.push(
+      latestDaily
+        ? `Latest daily: ${latestDaily.name} (${formatSize(latestDaily.sizeBytes)})`
+        : "No daily backups yet",
+    );
+    stdout.push(
+      latestWeekly
+        ? `Latest weekly: ${latestWeekly.name} (${formatSize(latestWeekly.sizeBytes)})`
+        : "No weekly backups yet",
+    );
+
+    const dailySize = await directorySize(dailyDir);
+    const weeklySize = await directorySize(weeklyDir);
+    const totalSize = dailySize + weeklySize;
+    stdout.push(`Disk usage total: ${formatSize(totalSize)}`);
+    stdout.push(`Disk usage daily: ${formatSize(dailySize)}`);
+    stdout.push(`Disk usage weekly: ${formatSize(weeklySize)}`);
+
+    const staleWarning = latestDaily
+      ? dailyStalenessMessage(latestDaily.name, options.now ?? new Date())
+      : "No backups yet. Run a backup.";
+    if (staleWarning) {
+      stdout.push(staleWarning);
+    }
+
+    const schedulerInstalled = await exists(join(config.backup.local_path, ".scheduler-installed"));
+    stdout.push(schedulerInstalled ? "Scheduled jobs: active" : "Scheduled jobs: not installed");
 
     return { exitCode: 0, stdout, stderr };
   } catch (error) {
@@ -53,18 +91,27 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-async function latestArchive(directory: string): Promise<string | null> {
+function dailyStalenessMessage(archiveName: string, now: Date): string | null {
+  const date = archiveDate(archiveName);
+  if (!date) return null;
+
+  const ageDays = Math.floor((now.getTime() - new Date(`${date}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000));
+  if (ageDays > 3) {
+    return "Warning: latest daily backup is stale.";
+  }
+  return "Health: recent daily backup exists.";
+}
+
+async function isReadableDirectory(path: string): Promise<{ ok: boolean }> {
   try {
-    const entries: string[] = [];
-    for await (const entry of Deno.readDir(directory)) {
-      if (entry.isFile && entry.name.endsWith(".tar.gz")) {
-        entries.push(entry.name);
-      }
+    for await (const _entry of Deno.readDir(path)) {
+      break;
     }
-    if (entries.length === 0) return null;
-    entries.sort();
-    return entries[entries.length - 1];
-  } catch {
-    return null;
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof Deno.errors.PermissionDenied) {
+      return { ok: false };
+    }
+    throw error;
   }
 }

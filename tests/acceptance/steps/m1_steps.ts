@@ -18,6 +18,7 @@ When("the status command is run", async function (this: ZenWorld) {
   const result = await runCli(["status"], {
     cwd: this.cwd,
     os: "darwin",
+    now: this.now,
     env: this.env,
   });
   this.stdout = result.stdout;
