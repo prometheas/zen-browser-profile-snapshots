@@ -12,7 +12,7 @@ Automated daily and weekly compressed snapshots of the Zen browser profile, stor
 
 - **Cross-platform:** Single binary for macOS (ARM/x86), Windows (x86), Linux (ARM/x86)
 - **Zero-maintenance:** Backups run on schedule via native OS scheduler (launchd, systemd, Task Scheduler)
-- **Complete coverage:** History, bookmarks, extensions + configs, workspaces, session state, themes, shortcuts, cookies, permissions, form history, preferences
+- **Complete coverage:** History, bookmarks, extensions + configs, workspaces, session state, themes, shortcuts, permissions, form history, preferences (cookies excluded for security)
 - **Safe SQLite handling:** Database backup via SQLite API (never raw file copy)
 - **Cloud sync:** Optional sync to Google Drive, OneDrive, or custom path
 - **Configurable retention:** Defaults 30 days daily, 12 weeks weekly
