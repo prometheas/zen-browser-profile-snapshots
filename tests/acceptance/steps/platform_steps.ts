@@ -264,12 +264,24 @@ Then("settings.toml still exists", async function (this: ZenWorld) {
   assertEquals(await exists(join(this.cwd, ".config", "zen-profile-backup", "settings.toml")), true);
 });
 
+Then("settings.toml does not exist", async function (this: ZenWorld) {
+  assertEquals(await exists(join(this.cwd, ".config", "zen-profile-backup", "settings.toml")), false);
+});
+
 Then("the installer displays a permission error", function (this: ZenWorld) {
   assert(this.stderr.toLowerCase().includes("permission"), "expected permission error");
 });
 
 Then("suggests running with appropriate permissions", function (this: ZenWorld) {
   assert(this.stderr.toLowerCase().includes("permission"), "expected permission guidance");
+});
+
+Given("{string} was run", async function (this: ZenWorld, command: string) {
+  await runLiteralCommand(this, command);
+});
+
+When("{string} is run", async function (this: ZenWorld, command: string) {
+  await runLiteralCommand(this, command);
 });
 
 Then("a launchd agent {string} is loaded", function (this: ZenWorld, label: string) {
@@ -365,6 +377,21 @@ Then("the warning is still logged to backup.log", async function (this: ZenWorld
 
 async function runInstall(world: ZenWorld): Promise<void> {
   const result = await runCli(["install"], {
+    cwd: world.cwd,
+    os: "darwin",
+    env: world.envWithHome(),
+  });
+  world.stdout = result.stdout;
+  world.stderr = result.stderr;
+  world.exitCode = result.exitCode;
+}
+
+async function runLiteralCommand(world: ZenWorld, command: string): Promise<void> {
+  const parts = command.trim().split(/\s+/);
+  if (parts[0] !== "zen-backup") {
+    throw new Error(`unsupported command literal: ${command}`);
+  }
+  const result = await runCli(parts.slice(1), {
     cwd: world.cwd,
     os: "darwin",
     env: world.envWithHome(),
