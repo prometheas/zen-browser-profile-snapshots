@@ -8,6 +8,10 @@ export class ZenWorld extends World {
   stderr = "";
   exitCode = -1;
   loadedConfig: unknown = null;
+  profileDir = "";
+  backupDir = "";
+  lastArchivePath = "";
+  missingProfilePath = "";
 
   async initWorkspace(): Promise<void> {
     this.cwd = await Deno.makeTempDir();

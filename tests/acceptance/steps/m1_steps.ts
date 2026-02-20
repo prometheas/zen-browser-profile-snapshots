@@ -37,6 +37,10 @@ Then("the exit code is {int}", function (this: ZenWorld, expected: number) {
   assertEquals(this.exitCode, expected);
 });
 
+Then("the exit code is non-zero", function (this: ZenWorld) {
+  assertEquals(this.exitCode === 0, false);
+});
+
 Given(
   "the environment variable {string} is set to {string}",
   function (this: ZenWorld, key: string, value: string) {
