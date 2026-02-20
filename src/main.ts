@@ -1,5 +1,6 @@
 import { runBackup } from "./commands/backup.ts";
 import { runList } from "./commands/list.ts";
+import { runRestore } from "./commands/restore.ts";
 import { runStatus } from "./commands/status.ts";
 import type { RuntimeOptions } from "./types.ts";
 
@@ -34,6 +35,16 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       };
     }
     result = await runBackup(kind, options);
+  } else if (args[0] === "restore") {
+    const archive = args[1];
+    if (!archive) {
+      return {
+        exitCode: 1,
+        stdout: "",
+        stderr: "Usage: zen-backup restore <archive>",
+      };
+    }
+    result = await runRestore(archive, options);
   } else {
     result = {
       exitCode: 1,
