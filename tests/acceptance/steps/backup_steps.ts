@@ -61,6 +61,22 @@ Given("a backup directory exists at the configured path", async function (this: 
   await Deno.mkdir(this.backupDir, { recursive: true });
 });
 
+Given("cloud sync is configured to a valid path", async function (this: ZenWorld) {
+  this.cloudPath = join(this.cwd, "cloud-backups");
+  await Deno.mkdir(this.cloudPath, { recursive: true });
+  await writeConfig(this, this.profileDir, this.backupDir, this.cloudPath);
+});
+
+Given("cloud sync is not configured", async function (this: ZenWorld) {
+  this.cloudPath = undefined;
+  await writeConfig(this, this.profileDir, this.backupDir, undefined);
+});
+
+Given("cloud sync is configured to an inaccessible path", async function (this: ZenWorld) {
+  this.cloudPath = "/dev/null/zen-cloud";
+  await writeConfig(this, this.profileDir, this.backupDir, this.cloudPath);
+});
+
 When("a daily backup is created", async function (this: ZenWorld) {
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
@@ -159,6 +175,27 @@ Then("the archive is in the {string} subdirectory", function (this: ZenWorld, su
   assertStringIncludes(this.lastArchivePath, `/${subdirectory}/`);
 });
 
+Then(
+  "the archive exists in the local {string} subdirectory",
+  async function (this: ZenWorld, subdirectory: string) {
+    const fileName = this.lastArchivePath.split("/").at(-1) ?? "";
+    const path = join(this.backupDir, subdirectory, fileName);
+    const exists = await pathExists(path);
+    assertEquals(exists, true);
+  },
+);
+
+Then(
+  "the archive exists in the cloud {string} subdirectory",
+  async function (this: ZenWorld, subdirectory: string) {
+    const fileName = this.lastArchivePath.split("/").at(-1) ?? "";
+    const cloudBase = this.cloudPath ?? join(this.cwd, "cloud-backups");
+    const path = join(cloudBase, subdirectory, fileName);
+    const exists = await pathExists(path);
+    assertEquals(exists, true);
+  },
+);
+
 Then("the archive contains {string}", async function (this: ZenWorld, path: string) {
   const entries = await listArchive(this.lastArchivePath);
   const joined = entries.join("\n");
@@ -213,18 +250,51 @@ Then("the extracted archive does not contain {string}", async function (this: Ze
   assertEquals(joined.includes(path), false);
 });
 
+Then("the extracted archive contains {string}", async function (this: ZenWorld, path: string) {
+  const entries = await listArchive(this.lastArchivePath);
+  const joined = entries.join("\n");
+  assertStringIncludes(joined, path);
+});
+
 Then("the log contains {string} or {string}", async function (this: ZenWorld, a: string, b: string) {
   const logPath = join(this.backupDir, "backup.log");
   const content = await Deno.readTextFile(logPath);
   assert(content.includes(a) || content.includes(b), `expected log to include ${a} or ${b}`);
 });
 
-async function writeConfig(world: ZenWorld, profilePath: string, backupPath: string): Promise<void> {
+Then("no cloud copy is attempted", async function (this: ZenWorld) {
+  const cloudBase = join(this.cwd, "cloud-backups");
+  assertEquals(await pathExists(cloudBase), false);
+});
+
+Then("{string} contains {string}", async function (this: ZenWorld, path: string, value: string) {
+  const resolvedPath = resolveStepPath(this, path);
+  const content = await Deno.readTextFile(resolvedPath);
+  assertStringIncludes(content, value);
+});
+
+Then(
+  "{string} contains a line matching {string}",
+  async function (this: ZenWorld, path: string, pattern: string) {
+    const resolvedPath = resolveStepPath(this, path);
+    const content = await Deno.readTextFile(resolvedPath);
+  const regex = new RegExp(pattern);
+  assert(regex.test(content), `expected ${path} to match ${pattern}`);
+  },
+);
+
+async function writeConfig(
+  world: ZenWorld,
+  profilePath: string,
+  backupPath: string,
+  cloudPath?: string,
+): Promise<void> {
   const configPath = world.resolvePath("custom/settings.toml");
   await Deno.mkdir(dirname(configPath), { recursive: true });
+  const cloudLine = cloudPath ? `cloud_path = "${cloudPath}"\n` : "";
   await Deno.writeTextFile(
     configPath,
-    `[profile]\npath = "${profilePath}"\n\n[backup]\nlocal_path = "${backupPath}"\n`,
+    `[profile]\npath = "${profilePath}"\n\n[backup]\nlocal_path = "${backupPath}"\n${cloudLine}`,
   );
 }
 
@@ -319,4 +389,21 @@ async function sqliteExec(dbPath: string, sql: string): Promise<void> {
   if (!out.success) {
     throw new Error(new TextDecoder().decode(out.stderr));
   }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await Deno.stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveStepPath(world: ZenWorld, path: string): string {
+  if (path.includes("/") || path.startsWith(".")) {
+    return path;
+  }
+
+  return join(world.backupDir, path);
 }

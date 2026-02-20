@@ -13,6 +13,7 @@ export class ZenWorld extends World {
   lastArchivePath = "";
   missingProfilePath = "";
   extractedDir = "";
+  cloudPath: string | undefined = undefined;
   sqliteLockProcess: Deno.ChildProcess | null = null;
   sqliteLockWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
 

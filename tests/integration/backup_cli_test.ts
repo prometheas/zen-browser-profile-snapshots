@@ -215,7 +215,70 @@ Deno.test("backup errors when profile path does not exist and no archive is crea
   }
 });
 
-async function createWorkspace(): Promise<{ tempDir: string; profileDir: string; backupDir: string }> {
+Deno.test("backup copies archive to cloud path when configured", async () => {
+  const cloudRoot = await Deno.makeTempDir({ prefix: "cloud-backups-" });
+  const { tempDir, profileDir } = await createWorkspace({ cloudPath: cloudRoot });
+  await seedPlacesDatabase(join(profileDir, "places.sqlite"));
+
+  const result = await runCli(["backup", "daily"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: {
+      HOME: tempDir,
+      ZEN_BACKUP_CONFIG: "custom/settings.toml",
+    },
+  });
+
+  assertEquals(result.exitCode, 0);
+  const localArchive = result.stdout.split(": ").at(-1) ?? "";
+  const cloudArchive = join(cloudRoot, "daily", localArchive.split("/").at(-1) ?? "");
+  assertEquals(await pathExists(cloudArchive), true);
+});
+
+Deno.test("backup returns success in local-only mode when cloud sync is disabled", async () => {
+  const { tempDir, profileDir } = await createWorkspace();
+  await seedPlacesDatabase(join(profileDir, "places.sqlite"));
+
+  const result = await runCli(["backup", "daily"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: {
+      HOME: tempDir,
+      ZEN_BACKUP_CONFIG: "custom/settings.toml",
+    },
+  });
+
+  assertEquals(result.exitCode, 0);
+  const expectedCloudPath = join(tempDir, "cloud-backups");
+  assertEquals(await pathExists(expectedCloudPath), false);
+});
+
+Deno.test("backup preserves local archive and returns non-zero when cloud sync fails", async () => {
+  const { tempDir, profileDir, backupDir } = await createWorkspace({
+    cloudPath: "/dev/null/zen-cloud",
+  });
+  await seedPlacesDatabase(join(profileDir, "places.sqlite"));
+
+  const result = await runCli(["backup", "daily"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: {
+      HOME: tempDir,
+      ZEN_BACKUP_CONFIG: "custom/settings.toml",
+    },
+  });
+
+  assertEquals(result.exitCode, 1);
+  const localArchive = result.stdout.split(": ").at(-1) ?? "";
+  assertEquals(await pathExists(localArchive), true);
+
+  const log = await Deno.readTextFile(join(backupDir, "backup.log"));
+  assertStringIncludes(log, "ERROR");
+});
+
+async function createWorkspace(
+  options: { cloudPath?: string } = {},
+): Promise<{ tempDir: string; profileDir: string; backupDir: string }> {
   const tempDir = await Deno.makeTempDir();
   const profileDir = join(tempDir, "profile");
   const backupDir = join(tempDir, "backups");
@@ -224,9 +287,10 @@ async function createWorkspace(): Promise<{ tempDir: string; profileDir: string;
   await Deno.mkdir(profileDir, { recursive: true });
   await Deno.mkdir(configDir, { recursive: true });
 
+  const cloudLine = options.cloudPath ? `cloud_path = "${options.cloudPath}"\n` : "";
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n${cloudLine}`,
   );
 
   return { tempDir, profileDir, backupDir };
