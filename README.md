@@ -3,7 +3,7 @@
 Zen Profile Backup is a cross-platform CLI tool that creates daily and weekly compressed snapshots of a Zen browser profile, with one-command restore, retention pruning, and optional cloud folder sync. It is designed to be safe for live profiles by copying SQLite databases using the SQLite backup API rather than raw file copies.
 
 ## Status
-This repository currently contains product specs and BDD-style feature definitions only. Implementation code has not been added yet.
+Core CLI functionality is implemented with Deno and covered by unit, integration, and acceptance tests. Current scope includes backup, list, status, restore, and macOS install/scheduling/notification flows.
 
 ## Key Capabilities
 - Scheduled daily/weekly backups via native OS schedulers (launchd/systemd/Task Scheduler)
@@ -26,7 +26,7 @@ Expected sections:
 - `[schedule]` with `daily_time`, `weekly_day`, `weekly_time`
 - `[notifications]` with `enabled`
 
-## CLI Commands (Planned)
+## CLI Commands
 - `zen-backup backup daily`
 - `zen-backup backup weekly`
 - `zen-backup restore <archive>`
@@ -34,6 +34,13 @@ Expected sections:
 - `zen-backup status`
 - `zen-backup install`
 - `zen-backup uninstall`
+
+## Packaging
+- Build macOS binaries:
+  - `deno task build:macos`
+- Build macOS release artifacts (binaries + checksums + release notes):
+  - `deno task release:macos`
+  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:macos`
 
 ## Docs
 The specs are the source of truth:
