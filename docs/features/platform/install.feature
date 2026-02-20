@@ -122,8 +122,8 @@ Feature: Install
   Scenario: Launchd agents installed on macOS
     Given the user completes the install wizard
     When the installer finishes
-    Then "com.zen-backup.daily.plist" exists in "~/Library/LaunchAgents/"
-    And "com.zen-backup.weekly.plist" exists in "~/Library/LaunchAgents/"
+    Then "com.prometheas.zen-backup.daily.plist" exists in "~/Library/LaunchAgents/"
+    And "com.prometheas.zen-backup.weekly.plist" exists in "~/Library/LaunchAgents/"
     And the agents are loaded and enabled
 
   @macos
@@ -154,8 +154,8 @@ Feature: Install
   Scenario: Uninstall removes launchd agents
     Given the backup tool is installed
     When the uninstall command is run
-    Then "com.zen-backup.daily.plist" is removed from "~/Library/LaunchAgents/"
-    And "com.zen-backup.weekly.plist" is removed from "~/Library/LaunchAgents/"
+    Then "com.prometheas.zen-backup.daily.plist" is removed from "~/Library/LaunchAgents/"
+    And "com.prometheas.zen-backup.weekly.plist" is removed from "~/Library/LaunchAgents/"
     And the agents are unloaded
 
   @linux
@@ -178,11 +178,17 @@ Feature: Install
     When the uninstall command is run
     Then all backup archives still exist
 
-  Scenario: Uninstall preserves settings.toml
+  Scenario: Uninstall removes settings.toml
     Given the backup tool is installed
     And settings.toml exists
     When the uninstall command is run
-    Then settings.toml still exists
+    Then settings.toml does not exist
+
+  Scenario: Uninstall warns when backups are preserved
+    Given the backup tool is installed
+    And backup archives exist in the backup directory
+    When the uninstall command is run
+    Then stderr contains "--purge-backups"
 
   # Error handling
   Scenario: Install fails gracefully on permission error

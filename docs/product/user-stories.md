@@ -373,6 +373,7 @@
 
 **Acceptance criteria:**
 - `zen-backup install` installs and enables both daily and weekly scheduled tasks
+- macOS launchd labels use `com.prometheas.zen-backup.daily` and `com.prometheas.zen-backup.weekly`
 - macOS: installs launchd plists to `~/Library/LaunchAgents/`
 - Linux: installs systemd user timers to `~/.config/systemd/user/`
 - Windows: creates Task Scheduler tasks in current user context
@@ -382,13 +383,29 @@
 
 ### US-27 Non-Destructive Uninstall
 **As a** Zen browser user
-**I want** to uninstall the scheduled jobs while keeping my backups and config
-**So that** I can safely disable automatic backups without losing any data
+**I want** to uninstall scheduled jobs and settings while keeping backups by default
+**So that** I can safely disable automation without accidentally deleting archives
 
 **Acceptance criteria:**
 - `zen-backup uninstall` removes scheduled tasks from the platform scheduler
-- Existing backup archives are not deleted
-- `settings.toml` is not deleted
+- `settings.toml` is removed
+- Existing backup archives are not deleted by default
+- Uninstall prints a warning that archives remain and suggests `--purge-backups`
+- `zen-backup uninstall --purge-backups` removes backup archives
+
+---
+
+### US-33 Scheduler Lifecycle Commands
+**As a** Zen browser user
+**I want** explicit schedule lifecycle commands
+**So that** I can start, stop, and inspect scheduling without reinstalling
+
+**Acceptance criteria:**
+- `zen-backup schedule start` enables scheduling
+- `zen-backup schedule stop` disables scheduling without removing definitions
+- `zen-backup schedule resume` is an alias of `start`
+- `zen-backup schedule pause` is an alias of `stop`
+- `zen-backup schedule status` reports state for daily and weekly jobs
 
 ---
 

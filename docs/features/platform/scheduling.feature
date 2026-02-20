@@ -9,12 +9,12 @@ Feature: Scheduling
   Scenario: Daily backup scheduled via launchd
     Given the backup tool is installed
     When the scheduler is queried
-    Then a launchd agent "com.zen-backup.daily" is loaded
+    Then a launchd agent "com.prometheas.zen-backup.daily" is loaded
     And the agent is configured to run at the configured daily_time (default: 12:30)
 
   @macos
   Scenario: Daily launchd agent fires backup command
-    Given the launchd agent "com.zen-backup.daily" is loaded
+    Given the launchd agent "com.prometheas.zen-backup.daily" is loaded
     When the scheduled time 12:30 is reached
     Then a daily backup archive is created
     And output is written to the log file
@@ -52,7 +52,7 @@ Feature: Scheduling
   Scenario: Weekly backup scheduled via launchd
     Given the backup tool is installed
     When the scheduler is queried
-    Then a launchd agent "com.zen-backup.weekly" is loaded
+    Then a launchd agent "com.prometheas.zen-backup.weekly" is loaded
     And the agent is configured to run at the configured weekly_day and weekly_time (default: Sunday 02:00)
 
   @linux
@@ -74,8 +74,8 @@ Feature: Scheduling
   Scenario: Status shows loaded launchd agents
     Given the launchd agents are loaded
     When the status command is run
-    Then stdout lists "com.zen-backup.daily"
-    And stdout lists "com.zen-backup.weekly"
+    Then stdout lists "com.prometheas.zen-backup.daily"
+    And stdout lists "com.prometheas.zen-backup.weekly"
 
   @macos
   Scenario: Status shows when no launchd agents are loaded
@@ -135,3 +135,34 @@ Feature: Scheduling
       | macos    |
       | linux    |
       | windows  |
+
+  # US-33: Scheduler Lifecycle Commands
+  @macos
+  Scenario: Schedule stop disables scheduled jobs without uninstalling
+    Given the backup tool is installed
+    When "zen-backup schedule stop" is run
+    Then stdout lists "com.prometheas.zen-backup.daily: paused"
+    And stdout lists "com.prometheas.zen-backup.weekly: paused"
+
+  @macos
+  Scenario: Schedule start enables paused jobs
+    Given the backup tool is installed
+    And "zen-backup schedule stop" was run
+    When "zen-backup schedule start" is run
+    Then stdout lists "com.prometheas.zen-backup.daily: active"
+    And stdout lists "com.prometheas.zen-backup.weekly: active"
+
+  @macos
+  Scenario: Schedule aliases map to primary commands
+    Given the backup tool is installed
+    When "zen-backup schedule pause" is run
+    Then stdout lists "paused"
+    When "zen-backup schedule resume" is run
+    Then stdout lists "active"
+
+  @macos
+  Scenario: Schedule status reports daily and weekly states
+    Given the backup tool is installed
+    When "zen-backup schedule status" is run
+    Then stdout lists "com.prometheas.zen-backup.daily"
+    And stdout lists "com.prometheas.zen-backup.weekly"
