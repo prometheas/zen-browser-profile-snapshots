@@ -120,6 +120,16 @@ Notes:
 - The smoke task is intentionally guarded and exits unless `ZEN_BACKUP_LIVE_SMOKE=1` is set.
 - If current scheduler jobs are paused before the test, they are left paused.
 
+## Acceptance Test Shortcuts
+
+Use task aliases instead of long Cucumber commands:
+
+- `deno task test:acceptance`
+- `deno task test:acceptance:platform`
+- `deno task test:acceptance:platform:macos`
+- `deno task test:acceptance:platform:linux`
+- `deno task test:acceptance:platform:windows`
+
 ## Feedback and Issues
 
 Report bugs and beta feedback in GitHub Issues:
