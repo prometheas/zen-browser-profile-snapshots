@@ -3,6 +3,7 @@ import { assert, assertEquals, assertMatch, assertStringIncludes } from "jsr:@st
 import { DataTable } from "npm:@cucumber/cucumber@12.6.0";
 import { dirname, join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../../src/main.ts";
+import type { Platform } from "../../../src/types.ts";
 import { ZenWorld } from "../support/world.ts";
 
 After(async function (this: ZenWorld) {
@@ -83,7 +84,7 @@ When("a daily backup is created", async function (this: ZenWorld) {
   await ensureBackupWorkspace(this);
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     now: this.now,
     env: {
       ...this.env,
@@ -101,7 +102,7 @@ When("a weekly backup is created", async function (this: ZenWorld) {
   await ensureBackupWorkspace(this);
   const result = await runCli(["backup", "weekly"], {
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     now: this.now,
     env: {
       ...this.env,
@@ -151,7 +152,7 @@ Given(
 When("a daily backup is attempted", async function (this: ZenWorld) {
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     now: this.now,
     env: {
       ...this.env,
@@ -444,4 +445,10 @@ function resolveStepPath(world: ZenWorld, path: string): string {
   }
 
   return join(world.backupDir, path);
+}
+
+function targetOs(world: ZenWorld): Platform {
+  const raw = world.env.ZEN_BACKUP_TEST_OS;
+  if (raw === "linux" || raw === "windows" || raw === "darwin") return raw;
+  return "darwin";
 }

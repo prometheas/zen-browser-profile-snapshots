@@ -2,6 +2,7 @@ import { DataTable, Given, Then } from "npm:@cucumber/cucumber@12.6.0";
 import { assert } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../../src/main.ts";
+import type { Platform } from "../../../src/types.ts";
 import { ZenWorld } from "../support/world.ts";
 
 Given(
@@ -57,7 +58,7 @@ Given("the backup tool is installed", async function (this: ZenWorld) {
   await ensureInstalled(this);
   await runCli(["install"], {
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     env: {
       ...this.env,
       HOME: this.cwd,
@@ -247,4 +248,10 @@ async function writeDailyArchiveForAge(world: ZenWorld, ageDays: number): Promis
     join(world.backupDir, "daily", `zen-backup-daily-${day}.tar.gz`),
     new Uint8Array(1024),
   );
+}
+
+function targetOs(world: ZenWorld): Platform {
+  const raw = world.env.ZEN_BACKUP_TEST_OS;
+  if (raw === "linux" || raw === "windows" || raw === "darwin") return raw;
+  return "darwin";
 }

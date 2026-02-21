@@ -1,8 +1,21 @@
-import { Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
+import { Before, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../../src/main.ts";
+import type { Platform } from "../../../src/types.ts";
 import { ZenWorld } from "../support/world.ts";
+
+Before({ tags: "@linux" }, function (this: ZenWorld) {
+  this.env.ZEN_BACKUP_TEST_OS = "linux";
+});
+
+Before({ tags: "@windows" }, function (this: ZenWorld) {
+  this.env.ZEN_BACKUP_TEST_OS = "windows";
+});
+
+Before({ tags: "@macos" }, function (this: ZenWorld) {
+  this.env.ZEN_BACKUP_TEST_OS = "darwin";
+});
 
 Given("a Zen profile exists at {string}", async function (this: ZenWorld, path: string) {
   const resolved = expandKnownPath(this, path);
@@ -15,6 +28,10 @@ Given("no Zen profile is detected", async function (this: ZenWorld) {
 });
 
 Given("Google Drive is mounted at {string}", async function (this: ZenWorld, path: string) {
+  await Deno.mkdir(expandKnownPath(this, path), { recursive: true });
+});
+
+Given("a Google Drive folder exists at {string}", async function (this: ZenWorld, path: string) {
   await Deno.mkdir(expandKnownPath(this, path), { recursive: true });
 });
 
@@ -66,6 +83,10 @@ Given("terminal-notifier is not installed", function (this: ZenWorld) {
   this.env.ZEN_BACKUP_FORCE_NO_TERMINAL_NOTIFIER = "1";
 });
 
+Given("notify-send is not installed", function (this: ZenWorld) {
+  this.env.ZEN_BACKUP_FORCE_NO_NOTIFY_SEND = "1";
+});
+
 Given("the launchd agent {string} is loaded", async function (this: ZenWorld, _label: string) {
   await ensurePlatformConfig(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
@@ -82,6 +103,44 @@ Given("the launchd agents are loaded", async function (this: ZenWorld) {
   await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.daily.plist"), "<plist/>");
   await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.weekly.plist"), "<plist/>");
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
+});
+
+Given("the systemd timer {string} is active", async function (this: ZenWorld, _timer: string) {
+  await ensurePlatformConfig(this);
+  const systemdDir = join(this.cwd, ".config", "systemd", "user");
+  await Deno.mkdir(systemdDir, { recursive: true });
+  await Deno.writeTextFile(
+    join(systemdDir, "zen-backup-daily.timer"),
+    "[Timer]\nOnCalendar=*-*-* 12:30:00\n",
+  );
+  await Deno.writeTextFile(
+    join(systemdDir, "zen-backup-weekly.timer"),
+    "[Timer]\nOnCalendar=Sun *-*-* 02:00:00\n",
+  );
+  await Deno.writeTextFile(join(systemdDir, ".zen-backup-loaded"), "1");
+});
+
+Given("the systemd timers are active", async function (this: ZenWorld) {
+  await ensurePlatformConfig(this);
+  const systemdDir = join(this.cwd, ".config", "systemd", "user");
+  await Deno.mkdir(systemdDir, { recursive: true });
+  await Deno.writeTextFile(
+    join(systemdDir, "zen-backup-daily.timer"),
+    "[Timer]\nOnCalendar=*-*-* 12:30:00\n",
+  );
+  await Deno.writeTextFile(
+    join(systemdDir, "zen-backup-weekly.timer"),
+    "[Timer]\nOnCalendar=Sun *-*-* 02:00:00\n",
+  );
+  await Deno.writeTextFile(join(systemdDir, ".zen-backup-loaded"), "1");
+});
+
+Given("no systemd timers are active", async function (this: ZenWorld) {
+  await ensurePlatformConfig(this);
+  const systemdDir = join(this.cwd, ".config", "systemd", "user");
+  await Deno.remove(join(systemdDir, "zen-backup-daily.timer")).catch(() => undefined);
+  await Deno.remove(join(systemdDir, "zen-backup-weekly.timer")).catch(() => undefined);
+  await Deno.remove(join(systemdDir, ".zen-backup-loaded")).catch(() => undefined);
 });
 
 Given("no launchd agents are loaded", async function (this: ZenWorld) {
@@ -119,7 +178,7 @@ When("the install command is run", async function (this: ZenWorld) {
 When("the uninstall command is run", async function (this: ZenWorld) {
   const result = await runCli(["uninstall"], {
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     env: this.envWithHome(),
   });
   this.stdout = result.stdout;
@@ -145,7 +204,7 @@ When("the user selects {string}", async function (this: ZenWorld, choice: string
 When("the scheduler is queried", async function (this: ZenWorld) {
   const result = await runCli(["status"], {
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     env: this.envWithHome(),
   });
   this.stdout = result.stdout;
@@ -165,7 +224,7 @@ When("the scheduled time 12:30 is reached", async function (this: ZenWorld) {
   );
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     env: { ...this.envWithHome(), ZEN_BACKUP_CONFIG: "custom/settings.toml" },
   });
   this.stdout = result.stdout;
@@ -260,6 +319,13 @@ Then("the agents are loaded and enabled", async function (this: ZenWorld) {
   assertEquals(await exists(join(this.cwd, "Library", "LaunchAgents", ".zen-backup-loaded")), true);
 });
 
+Then("the timers are enabled", async function (this: ZenWorld) {
+  assertEquals(
+    await exists(join(this.cwd, ".config", "systemd", "user", ".zen-backup-loaded")),
+    true,
+  );
+});
+
 Then("the plist files contain actual paths, not placeholders", async function (this: ZenWorld) {
   const daily = await Deno.readTextFile(
     join(this.cwd, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist"),
@@ -280,6 +346,11 @@ Then("the agents are unloaded", async function (this: ZenWorld) {
     await exists(join(this.cwd, "Library", "LaunchAgents", ".zen-backup-loaded")),
     false,
   );
+});
+
+Then("{string} is disabled and removed", async function (this: ZenWorld, timer: string) {
+  const path = join(this.cwd, ".config", "systemd", "user", timer);
+  assertEquals(await exists(path), false);
 });
 
 Then("all backup archives still exist", async function (this: ZenWorld) {
@@ -322,6 +393,32 @@ When("{string} is run", async function (this: ZenWorld, command: string) {
 Then("a launchd agent {string} is loaded", function (this: ZenWorld, label: string) {
   assertStringIncludes(this.stdout, normalizeLegacyName(label).replace(".plist", ""));
 });
+
+Then("a systemd user timer {string} is active", function (this: ZenWorld, timer: string) {
+  assertStringIncludes(this.stdout, timer);
+});
+
+Then(
+  "the timer is configured to run at the configured daily_time \\(default: {int}:{int})",
+  async function (this: ZenWorld, hour: number, minute: number) {
+    const path = join(this.cwd, ".config", "systemd", "user", "zen-backup-daily.timer");
+    const timer = await Deno.readTextFile(path);
+    const hh = String(hour).padStart(2, "0");
+    const mm = String(minute).padStart(2, "0");
+    assertStringIncludes(timer, `OnCalendar=*-*-* ${hh}:${mm}:00`);
+  },
+);
+
+Then(
+  "the timer is configured to run at the configured weekly_day and weekly_time \\(default: Sunday {int}:{int})",
+  async function (this: ZenWorld, hour: number, minute: number) {
+    const path = join(this.cwd, ".config", "systemd", "user", "zen-backup-weekly.timer");
+    const timer = await Deno.readTextFile(path);
+    const hh = String(hour).padStart(2, "0");
+    const mm = String(minute).padStart(2, "0");
+    assertStringIncludes(timer, `OnCalendar=Sun *-*-* ${hh}:${mm}:00`);
+  },
+);
 
 Then(
   "the agent is configured to run at the configured daily_time \\(default: 12:30\\)",
@@ -370,6 +467,10 @@ Then("output is written to the log file", async function (this: ZenWorld) {
   assertEquals(await exists(join(this.cwd, "backups", "backup.log")), true);
 });
 
+Then("output is written to the journal", async function (this: ZenWorld) {
+  assertEquals(await exists(join(this.cwd, "backups", "backup.log")), true);
+});
+
 Then("stdout lists {string}", function (this: ZenWorld, value: string) {
   assertStringIncludes(this.stdout, normalizeLegacyName(value).replace(".plist", ""));
 });
@@ -380,6 +481,24 @@ Then(
     const content = await readNotifications(this);
     assertStringIncludes(content, title);
     assertStringIncludes(content, "darwin");
+  },
+);
+
+Then(
+  "a desktop notification is displayed with title {string}",
+  async function (this: ZenWorld, title: string) {
+    const content = await readNotifications(this);
+    assertStringIncludes(content, title);
+    assertStringIncludes(content, "linux");
+  },
+);
+
+Then(
+  "a Windows toast notification is displayed with title {string}",
+  async function (this: ZenWorld, title: string) {
+    const content = await readNotifications(this);
+    assertStringIncludes(content, title);
+    assertStringIncludes(content, "windows");
   },
 );
 
@@ -419,10 +538,15 @@ Then("the warning is still logged to backup.log", async function (this: ZenWorld
   assertStringIncludes(content.toLowerCase(), "warning");
 });
 
+Then("a warning is logged about notifications unavailable", async function (this: ZenWorld) {
+  const content = await Deno.readTextFile(join(this.cwd, "backups", "backup.log"));
+  assertStringIncludes(content.toLowerCase(), "notifications unavailable");
+});
+
 async function runInstall(world: ZenWorld): Promise<void> {
   const result = await runCli(["install"], {
     cwd: world.cwd,
-    os: "darwin",
+    os: targetOs(world),
     env: world.envWithHome(),
   });
   world.stdout = result.stdout;
@@ -437,7 +561,7 @@ async function runLiteralCommand(world: ZenWorld, command: string): Promise<void
   }
   const result = await runCli(parts.slice(1), {
     cwd: world.cwd,
-    os: "darwin",
+    os: targetOs(world),
     env: world.envWithHome(),
   });
   world.stdout = result.stdout;
@@ -500,4 +624,10 @@ async function exists(path: string): Promise<boolean> {
 
 function normalizeLegacyName(value: string): string {
   return value.replace("com.zen-backup", "com.prometheas.zen-backup");
+}
+
+function targetOs(world: ZenWorld): Platform {
+  const raw = world.env.ZEN_BACKUP_TEST_OS;
+  if (raw === "linux" || raw === "windows" || raw === "darwin") return raw;
+  return "darwin";
 }

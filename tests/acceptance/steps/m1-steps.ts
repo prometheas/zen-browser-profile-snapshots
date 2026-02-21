@@ -4,6 +4,7 @@ import { dirname } from "jsr:@std/path@1.1.4";
 import { loadConfig } from "../../../src/config.ts";
 import { expandPath } from "../../../src/core/path-utils.ts";
 import { runCli } from "../../../src/main.ts";
+import type { Platform } from "../../../src/types.ts";
 import { ZenWorld } from "../support/world.ts";
 
 Before(async function (this: ZenWorld) {
@@ -17,7 +18,7 @@ Given("no settings.toml file exists", function (this: ZenWorld) {
 When("the status command is run", async function (this: ZenWorld) {
   const result = await runCli(["status"], {
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     now: this.now,
     env: this.env,
   });
@@ -61,7 +62,7 @@ Given(
 When("the configuration is loaded", async function (this: ZenWorld) {
   this.loadedConfig = await loadConfig({
     cwd: this.cwd,
-    os: "darwin",
+    os: targetOs(this),
     env: this.env,
   });
 });
@@ -74,3 +75,9 @@ Then(
     assertEquals(config.profile.path, expected);
   },
 );
+
+function targetOs(world: ZenWorld): Platform {
+  const raw = world.env.ZEN_BACKUP_TEST_OS;
+  if (raw === "linux" || raw === "windows" || raw === "darwin") return raw;
+  return "darwin";
+}

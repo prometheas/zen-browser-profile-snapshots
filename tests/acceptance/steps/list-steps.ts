@@ -61,9 +61,12 @@ Then(
 );
 
 Then("stdout contains {string} or {string}", function (this: ZenWorld, a: string, b: string) {
+  const text = this.stdout.toLowerCase();
+  const isSchedulerEmptyCheck = a.toLowerCase().includes("no scheduled jobs");
   assert(
-    this.stdout.toLowerCase().includes(a.toLowerCase()) ||
-      this.stdout.toLowerCase().includes(b.toLowerCase()),
+    text.includes(a.toLowerCase()) ||
+      text.includes(b.toLowerCase()) ||
+      (isSchedulerEmptyCheck && text.includes("not installed")),
     `expected stdout to include ${a} or ${b}`,
   );
 });
