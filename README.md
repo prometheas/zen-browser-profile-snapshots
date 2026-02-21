@@ -55,31 +55,43 @@ Notes:
 - Use `uninstall --purge-backups` to also remove backup archives.
 - macOS launchd labels use `com.prometheas.zen-backup.daily` and `com.prometheas.zen-backup.weekly`.
 
-## Install (macOS Beta)
+## Install
 
-Option A: Download release binaries from GitHub Releases:
+### macOS: one-line install from GitHub release (default latest)
 
-1. Download:
+Installs to `/usr/local/bin/zen-backup` (uses `sudo` if needed):
 
-- `zen-backup-aarch64-apple-darwin` for Apple Silicon
-- `zen-backup-x86_64-apple-darwin` for Intel
+```sh
+curl -fsSL https://raw.githubusercontent.com/prometheas/zen-browser-profile-snapshots/main/scripts/install-from-release.sh | sh
+```
 
-1. Rename and mark executable:
+Install a specific version:
 
-- `mv zen-backup-<target> zen-backup`
-- `chmod +x zen-backup`
+```sh
+ZEN_BACKUP_VERSION=v0.3.0-beta.1 curl -fsSL https://raw.githubusercontent.com/prometheas/zen-browser-profile-snapshots/main/scripts/install-from-release.sh | sh
+```
 
-1. Place in your `PATH` (example):
+### macOS: installer package
 
-- `mv zen-backup ~/.local/bin/zen-backup`
+From GitHub Releases, download either:
 
-1. Verify:
+- `zen-backup-macos-installer.pkg`
+- `zen-backup-macos-installer.dmg` (contains the `.pkg`)
 
-- `zen-backup status`
+The installer places `zen-backup` at `/usr/local/bin/zen-backup`.
 
-Option B: Build from source (requires Deno 2):
+### Manual binary install (macOS/Linux)
+
+Download the platform binary from GitHub Releases and install:
+
+```sh
+install -m 0755 ./zen-backup-<target> /usr/local/bin/zen-backup
+```
+
+### Build from source (requires Deno 2)
 
 - `deno task build:macos`
+- `deno task build:linux`
 
 ## First-Time Setup
 
