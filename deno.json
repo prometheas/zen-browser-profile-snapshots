@@ -22,6 +22,7 @@
     "build:macos:arm64": "deno compile --allow-all --target aarch64-apple-darwin --output dist/zen-backup-aarch64-apple-darwin src/main.ts",
     "build:macos:x64": "deno compile --allow-all --target x86_64-apple-darwin --output dist/zen-backup-x86_64-apple-darwin src/main.ts",
     "build:macos": "deno task build:macos:arm64 && deno task build:macos:x64",
-    "release:macos": "deno run -A scripts/release_macos.ts"
+    "release:macos": "deno run -A scripts/release_macos.ts",
+    "test:smoke:macos:scheduler": "deno run -A scripts/smoke_macos_scheduler.ts"
   }
 }
