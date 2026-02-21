@@ -39,6 +39,27 @@ Deno.test("install writes config and macOS launchd plists", async () => {
   assertStringIncludes(dailyContent, tempDir);
 });
 
+Deno.test("install writes config and Linux systemd user units", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const profilePath = join(tempDir, ".zen", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+
+  const result = await runCli(["install"], {
+    cwd: tempDir,
+    os: "linux",
+    env: { HOME: tempDir },
+  });
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stdout, "Detected profile path");
+
+  const configPath = join(tempDir, ".config", "zen-profile-backup", "settings.toml");
+  const dailyTimer = join(tempDir, ".config", "systemd", "user", "zen-backup-daily.timer");
+  const weeklyTimer = join(tempDir, ".config", "systemd", "user", "zen-backup-weekly.timer");
+  assertEquals(await exists(configPath), true);
+  assertEquals(await exists(dailyTimer), true);
+  assertEquals(await exists(weeklyTimer), true);
+});
+
 Deno.test("install uses process HOME when runtime env is not overridden", async () => {
   const tempHome = await Deno.makeTempDir();
   const profilePath = join(
@@ -206,6 +227,89 @@ Deno.test("schedule status reports no jobs before install", async () => {
   });
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "No scheduled jobs");
+});
+
+Deno.test("linux schedule start/stop/status and aliases work", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const profilePath = join(tempDir, ".zen", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+  await runCli(["install"], { cwd: tempDir, os: "linux", env: { HOME: tempDir } });
+
+  const stop = await runCli(["schedule", "stop"], {
+    cwd: tempDir,
+    os: "linux",
+    env: { HOME: tempDir },
+  });
+  assertEquals(stop.exitCode, 0);
+  assertStringIncludes(stop.stdout, "stopped");
+  assertStringIncludes(stop.stdout, "zen-backup-daily.timer: paused");
+  assertStringIncludes(stop.stdout, "zen-backup-weekly.timer: paused");
+
+  const resume = await runCli(["schedule", "resume"], {
+    cwd: tempDir,
+    os: "linux",
+    env: { HOME: tempDir },
+  });
+  assertEquals(resume.exitCode, 0);
+  assertStringIncludes(resume.stdout, "started");
+  assertStringIncludes(resume.stdout, "zen-backup-daily.timer: active");
+  assertStringIncludes(resume.stdout, "zen-backup-weekly.timer: active");
+
+  const pauseAlias = await runCli(["schedule", "pause"], {
+    cwd: tempDir,
+    os: "linux",
+    env: { HOME: tempDir },
+  });
+  assertEquals(pauseAlias.exitCode, 0);
+  assertStringIncludes(pauseAlias.stdout, "paused");
+
+  const startAlias = await runCli(["schedule", "start"], {
+    cwd: tempDir,
+    os: "linux",
+    env: { HOME: tempDir },
+  });
+  assertEquals(startAlias.exitCode, 0);
+  assertStringIncludes(startAlias.stdout, "active");
+
+  const status = await runCli(["schedule", "status"], {
+    cwd: tempDir,
+    os: "linux",
+    env: { HOME: tempDir },
+  });
+  assertEquals(status.exitCode, 0);
+  assertStringIncludes(status.stdout, "zen-backup-daily.timer");
+  assertStringIncludes(status.stdout, "zen-backup-weekly.timer");
+});
+
+Deno.test("linux uninstall removes timers and settings, and preserves backups by default", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const profilePath = join(tempDir, ".zen", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+  await runCli(["install"], { cwd: tempDir, os: "linux", env: { HOME: tempDir } });
+  await Deno.mkdir(join(tempDir, "zen-backups", "daily"), { recursive: true });
+  await Deno.writeTextFile(
+    join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz"),
+    "x",
+  );
+
+  const result = await runCli(["uninstall"], {
+    cwd: tempDir,
+    os: "linux",
+    env: { HOME: tempDir },
+  });
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stderr, "--purge-backups");
+
+  const configPath = join(tempDir, ".config", "zen-profile-backup", "settings.toml");
+  const dailyTimer = join(tempDir, ".config", "systemd", "user", "zen-backup-daily.timer");
+  const weeklyTimer = join(tempDir, ".config", "systemd", "user", "zen-backup-weekly.timer");
+  assertEquals(await exists(configPath), false);
+  assertEquals(await exists(dailyTimer), false);
+  assertEquals(await exists(weeklyTimer), false);
+  assertEquals(
+    await exists(join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz")),
+    true,
+  );
 });
 
 Deno.test("backup writes notifications when browser running and cloud sync fails", async () => {

@@ -9,6 +9,8 @@ export interface SchedulerStatus {
 
 export const DAILY_LABEL = "com.prometheas.zen-backup.daily";
 export const WEEKLY_LABEL = "com.prometheas.zen-backup.weekly";
+export const DAILY_TIMER = "zen-backup-daily.timer";
+export const WEEKLY_TIMER = "zen-backup-weekly.timer";
 
 export async function installScheduler(
   config: AppConfig,
@@ -18,6 +20,9 @@ export async function installScheduler(
   if (os === "darwin") {
     return await installLaunchd(config, options);
   }
+  if (os === "linux") {
+    return await installSystemd(config, options);
+  }
   return { installed: false, labels: [], states: {} };
 }
 
@@ -26,11 +31,15 @@ export async function uninstallScheduler(options: RuntimeOptions = {}): Promise<
   if (os === "darwin") {
     return await uninstallLaunchd(options);
   }
+  if (os === "linux") {
+    return await uninstallSystemd(options);
+  }
   return { installed: false, labels: [], states: {} };
 }
 
 export async function startScheduler(options: RuntimeOptions = {}): Promise<SchedulerStatus> {
   const os = options.os ?? (Deno.build.os as Platform);
+  if (os === "linux") return await startSystemd(options);
   if (os !== "darwin") return { installed: false, labels: [], states: {} };
 
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
@@ -53,6 +62,7 @@ export async function startScheduler(options: RuntimeOptions = {}): Promise<Sche
 
 export async function stopScheduler(options: RuntimeOptions = {}): Promise<SchedulerStatus> {
   const os = options.os ?? (Deno.build.os as Platform);
+  if (os === "linux") return await stopSystemd(options);
   if (os !== "darwin") return { installed: false, labels: [], states: {} };
 
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
@@ -77,6 +87,9 @@ export async function queryScheduler(options: RuntimeOptions = {}): Promise<Sche
   const os = options.os ?? (Deno.build.os as Platform);
   if (os === "darwin") {
     return await queryLaunchd(options);
+  }
+  if (os === "linux") {
+    return await querySystemd(options);
   }
   return { installed: false, labels: [], states: {} };
 }
@@ -204,6 +217,149 @@ async function queryLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
   };
 }
 
+async function installSystemd(
+  config: AppConfig,
+  options: RuntimeOptions,
+): Promise<SchedulerStatus> {
+  const systemdDir = join(resolveHome(options), ".config", "systemd", "user");
+  await Deno.mkdir(systemdDir, { recursive: true });
+
+  const dailyTimerPath = join(systemdDir, DAILY_TIMER);
+  const weeklyTimerPath = join(systemdDir, WEEKLY_TIMER);
+  const dailyServicePath = join(systemdDir, "zen-backup-daily.service");
+  const weeklyServicePath = join(systemdDir, "zen-backup-weekly.service");
+
+  await Deno.writeTextFile(dailyServicePath, systemdServiceTemplate("daily"));
+  await Deno.writeTextFile(weeklyServicePath, systemdServiceTemplate("weekly"));
+  await Deno.writeTextFile(
+    dailyTimerPath,
+    systemdDailyTimerTemplate({
+      hour: hourFromTime(config.schedule.daily_time),
+      minute: minuteFromTime(config.schedule.daily_time),
+    }),
+  );
+  await Deno.writeTextFile(
+    weeklyTimerPath,
+    systemdWeeklyTimerTemplate({
+      hour: hourFromTime(config.schedule.weekly_time),
+      minute: minuteFromTime(config.schedule.weekly_time),
+      weekday: weekdayAbbrev(config.schedule.weekly_day),
+    }),
+  );
+
+  if (await shouldUseRealSystemctl(options)) {
+    await systemctl(["--user", "daemon-reload"], options);
+    await systemctl(["--user", "enable", "--now", DAILY_TIMER], options);
+    await systemctl(["--user", "enable", "--now", WEEKLY_TIMER], options);
+  }
+
+  await Deno.writeTextFile(join(systemdDir, ".zen-backup-loaded"), "1");
+  await Deno.remove(join(systemdDir, `.disabled-${DAILY_TIMER}`)).catch(() => undefined);
+  await Deno.remove(join(systemdDir, `.disabled-${WEEKLY_TIMER}`)).catch(() => undefined);
+  return await querySystemd(options);
+}
+
+async function uninstallSystemd(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const systemdDir = join(resolveHome(options), ".config", "systemd", "user");
+  const dailyTimerPath = join(systemdDir, DAILY_TIMER);
+  const weeklyTimerPath = join(systemdDir, WEEKLY_TIMER);
+  const dailyServicePath = join(systemdDir, "zen-backup-daily.service");
+  const weeklyServicePath = join(systemdDir, "zen-backup-weekly.service");
+
+  if (await shouldUseRealSystemctl(options)) {
+    await systemctl(["--user", "disable", "--now", DAILY_TIMER], options).catch(() => undefined);
+    await systemctl(["--user", "disable", "--now", WEEKLY_TIMER], options).catch(() => undefined);
+    await systemctl(["--user", "daemon-reload"], options).catch(() => undefined);
+  }
+
+  await Deno.remove(join(systemdDir, ".zen-backup-loaded")).catch(() => undefined);
+  await Deno.remove(join(systemdDir, `.disabled-${DAILY_TIMER}`)).catch(() => undefined);
+  await Deno.remove(join(systemdDir, `.disabled-${WEEKLY_TIMER}`)).catch(() => undefined);
+  await Deno.remove(dailyTimerPath).catch(() => undefined);
+  await Deno.remove(weeklyTimerPath).catch(() => undefined);
+  await Deno.remove(dailyServicePath).catch(() => undefined);
+  await Deno.remove(weeklyServicePath).catch(() => undefined);
+
+  return {
+    installed: false,
+    labels: [],
+    states: {
+      [DAILY_TIMER]: "not_installed",
+      [WEEKLY_TIMER]: "not_installed",
+    },
+  };
+}
+
+async function startSystemd(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const systemdDir = join(resolveHome(options), ".config", "systemd", "user");
+  const dailyTimerPath = join(systemdDir, DAILY_TIMER);
+  const weeklyTimerPath = join(systemdDir, WEEKLY_TIMER);
+  const hasTimers = await exists(dailyTimerPath) && await exists(weeklyTimerPath);
+  if (!hasTimers) return await querySystemd(options);
+
+  if (await shouldUseRealSystemctl(options)) {
+    await systemctl(["--user", "enable", "--now", DAILY_TIMER], options);
+    await systemctl(["--user", "enable", "--now", WEEKLY_TIMER], options);
+  }
+
+  await Deno.remove(join(systemdDir, `.disabled-${DAILY_TIMER}`)).catch(() => undefined);
+  await Deno.remove(join(systemdDir, `.disabled-${WEEKLY_TIMER}`)).catch(() => undefined);
+  await Deno.writeTextFile(join(systemdDir, ".zen-backup-loaded"), "1");
+  return await querySystemd(options);
+}
+
+async function stopSystemd(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const systemdDir = join(resolveHome(options), ".config", "systemd", "user");
+  const dailyTimerPath = join(systemdDir, DAILY_TIMER);
+  const weeklyTimerPath = join(systemdDir, WEEKLY_TIMER);
+  const hasTimers = await exists(dailyTimerPath) && await exists(weeklyTimerPath);
+  if (!hasTimers) return await querySystemd(options);
+
+  if (await shouldUseRealSystemctl(options)) {
+    await systemctl(["--user", "disable", "--now", DAILY_TIMER], options);
+    await systemctl(["--user", "disable", "--now", WEEKLY_TIMER], options);
+  }
+
+  await Deno.writeTextFile(join(systemdDir, `.disabled-${DAILY_TIMER}`), "1");
+  await Deno.writeTextFile(join(systemdDir, `.disabled-${WEEKLY_TIMER}`), "1");
+  await Deno.writeTextFile(join(systemdDir, ".zen-backup-loaded"), "1");
+  return await querySystemd(options);
+}
+
+async function querySystemd(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const systemdDir = join(resolveHome(options), ".config", "systemd", "user");
+  const dailyTimerPath = join(systemdDir, DAILY_TIMER);
+  const weeklyTimerPath = join(systemdDir, WEEKLY_TIMER);
+  const dailyInstalled = await exists(dailyTimerPath);
+  const weeklyInstalled = await exists(weeklyTimerPath);
+  const markerLoaded = await exists(join(systemdDir, ".zen-backup-loaded"));
+  let dailyPaused = await exists(join(systemdDir, `.disabled-${DAILY_TIMER}`));
+  let weeklyPaused = await exists(join(systemdDir, `.disabled-${WEEKLY_TIMER}`));
+  let dailyLoaded = markerLoaded && dailyInstalled;
+  let weeklyLoaded = markerLoaded && weeklyInstalled;
+
+  if (await shouldUseRealSystemctl(options)) {
+    const dailyEnabled = await systemctlOptional(["--user", "is-enabled", DAILY_TIMER], options);
+    const weeklyEnabled = await systemctlOptional(["--user", "is-enabled", WEEKLY_TIMER], options);
+    const dailyActive = await systemctlOptional(["--user", "is-active", DAILY_TIMER], options);
+    const weeklyActive = await systemctlOptional(["--user", "is-active", WEEKLY_TIMER], options);
+    if (dailyEnabled !== null) dailyPaused = !dailyEnabled.trim().startsWith("enabled");
+    if (weeklyEnabled !== null) weeklyPaused = !weeklyEnabled.trim().startsWith("enabled");
+    if (dailyActive !== null) dailyLoaded = dailyActive.trim().startsWith("active");
+    if (weeklyActive !== null) weeklyLoaded = weeklyActive.trim().startsWith("active");
+  }
+
+  const states: Record<string, "active" | "paused" | "not_installed"> = {};
+  states[DAILY_TIMER] = resolveState(dailyInstalled, dailyPaused, dailyLoaded);
+  states[WEEKLY_TIMER] = resolveState(weeklyInstalled, weeklyPaused, weeklyLoaded);
+
+  return {
+    installed: dailyInstalled && weeklyInstalled,
+    labels: dailyInstalled || weeklyInstalled ? [DAILY_TIMER, WEEKLY_TIMER] : [],
+    states,
+  };
+}
+
 function resolveHome(options: RuntimeOptions): string {
   const env = options.env ?? Deno.env.toObject();
   return env.HOME ?? env.USERPROFILE ?? Deno.cwd();
@@ -219,6 +375,20 @@ async function shouldUseRealLaunchctl(options: RuntimeOptions): Promise<boolean>
   const processHome = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE");
   if (processHome && runtimeHome !== processHome) return false;
   return await commandExists("launchctl", options);
+}
+
+async function shouldUseRealSystemctl(options: RuntimeOptions): Promise<boolean> {
+  if (options.env?.ZEN_BACKUP_FORCE_SIMULATED_SYSTEMD === "1") {
+    return false;
+  }
+  const os = options.os ?? (Deno.build.os as Platform);
+  if (os !== "linux") return false;
+  const runtimeHome = resolveHome(options);
+  const processHome = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE");
+  if (processHome && runtimeHome !== processHome) return false;
+  if (!(await commandExists("systemctl", options))) return false;
+  const probe = await systemctlOptional(["--user", "show-environment"], options);
+  return probe !== null;
 }
 
 async function launchctlDomain(options: RuntimeOptions): Promise<string> {
@@ -243,6 +413,31 @@ async function launchctl(args: string[], options: RuntimeOptions): Promise<strin
 
 async function launchctlOptional(args: string[], options: RuntimeOptions): Promise<string | null> {
   const out = await new Deno.Command("launchctl", {
+    args,
+    env: commandEnv(options),
+    stdout: "piped",
+    stderr: "null",
+  }).output();
+  if (!out.success) return null;
+  return new TextDecoder().decode(out.stdout);
+}
+
+async function systemctl(args: string[], options: RuntimeOptions): Promise<string> {
+  const out = await new Deno.Command("systemctl", {
+    args,
+    env: commandEnv(options),
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  if (!out.success) {
+    const stderr = new TextDecoder().decode(out.stderr).trim();
+    throw new Error(`systemctl ${args.join(" ")} failed: ${stderr}`);
+  }
+  return new TextDecoder().decode(out.stdout);
+}
+
+async function systemctlOptional(args: string[], options: RuntimeOptions): Promise<string | null> {
+  const out = await new Deno.Command("systemctl", {
     args,
     env: commandEnv(options),
     stdout: "piped",
@@ -329,6 +524,20 @@ function weekdayNumber(day: string): number {
   return map[normalized] ?? 0;
 }
 
+function weekdayAbbrev(day: string): string {
+  const normalized = day.toLowerCase();
+  const map: Record<string, string> = {
+    sunday: "Sun",
+    monday: "Mon",
+    tuesday: "Tue",
+    wednesday: "Wed",
+    thursday: "Thu",
+    friday: "Fri",
+    saturday: "Sat",
+  };
+  return map[normalized] ?? "Sun";
+}
+
 function launchdTemplate(input: {
   label: string;
   kind: "daily" | "weekly";
@@ -365,6 +574,48 @@ ${dayOfWeekLine}    <key>Hour</key>
   <string>${join(input.backupRoot, "backup.log")}</string>
 </dict>
 </plist>
+`;
+}
+
+function systemdServiceTemplate(kind: "daily" | "weekly"): string {
+  return `[Unit]
+Description=Zen Backup (${kind})
+
+[Service]
+Type=oneshot
+ExecStart=zen-backup backup ${kind}
+`;
+}
+
+function systemdDailyTimerTemplate(input: { hour: number; minute: number }): string {
+  const hour = String(input.hour).padStart(2, "0");
+  const minute = String(input.minute).padStart(2, "0");
+  return `[Unit]
+Description=Zen Backup Daily Timer
+
+[Timer]
+OnCalendar=*-*-* ${hour}:${minute}:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+`;
+}
+
+function systemdWeeklyTimerTemplate(
+  input: { hour: number; minute: number; weekday: string },
+): string {
+  const hour = String(input.hour).padStart(2, "0");
+  const minute = String(input.minute).padStart(2, "0");
+  return `[Unit]
+Description=Zen Backup Weekly Timer
+
+[Timer]
+OnCalendar=${input.weekday} *-*-* ${hour}:${minute}:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
 `;
 }
 
