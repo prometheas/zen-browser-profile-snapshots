@@ -1,6 +1,7 @@
 import { assertEquals, assertThrows } from "jsr:@std/assert@1.0.19";
 import {
   parseSchedulerStates,
+  parseSchtasksEnabledFromListOutput,
   validateSchedulerStates,
   waitForExpectedStates,
 } from "../../scripts/task--test--smoke--windows--scheduler.ts";
@@ -74,4 +75,22 @@ Deno.test("waitForExpectedStates retries until tasks become active", async () =>
   );
 
   assertEquals(attempts, 3);
+});
+
+Deno.test("parseSchtasksEnabledFromListOutput detects disabled task state", () => {
+  const output = [
+    "Folder: \\",
+    "TaskName: ZenBackupSmokeDaily",
+    "Scheduled Task State: Disabled",
+  ].join("\n");
+  assertEquals(parseSchtasksEnabledFromListOutput(output), false);
+});
+
+Deno.test("parseSchtasksEnabledFromListOutput detects enabled task state", () => {
+  const output = [
+    "Folder: \\",
+    "TaskName: ZenBackupSmokeDaily",
+    "Scheduled Task State: Enabled",
+  ].join("\n");
+  assertEquals(parseSchtasksEnabledFromListOutput(output), true);
 });

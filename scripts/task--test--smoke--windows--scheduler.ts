@@ -205,6 +205,20 @@ async function queryNativeTask(
   taskName: string,
   env: Record<string, string>,
 ): Promise<{ installed: boolean; enabled: boolean }> {
+  const verboseOut = await new Deno.Command("schtasks", {
+    args: ["/Query", "/TN", taskName, "/V", "/FO", "LIST"],
+    env,
+    stdout: "piped",
+    stderr: "null",
+  }).output().catch(() => undefined);
+  if (verboseOut?.success) {
+    const verbose = new TextDecoder().decode(verboseOut.stdout);
+    const parsedEnabled = parseSchtasksEnabledFromListOutput(verbose);
+    if (parsedEnabled !== null) {
+      return { installed: true, enabled: parsedEnabled };
+    }
+  }
+
   const out = await new Deno.Command("schtasks", {
     args: ["/Query", "/TN", taskName, "/XML"],
     env,
@@ -223,6 +237,16 @@ async function queryNativeTask(
     installed: true,
     enabled: enabledMatch[1].toLowerCase() === "true",
   };
+}
+
+export function parseSchtasksEnabledFromListOutput(output: string): boolean | null {
+  for (const rawLine of output.split("\n")) {
+    const line = rawLine.trim().toLowerCase();
+    if (!line.includes("scheduled task state:") && !line.startsWith("status:")) continue;
+    if (line.includes("disabled")) return false;
+    if (line.includes("enabled") || line.includes("ready") || line.includes("running")) return true;
+  }
+  return null;
 }
 
 async function run(args: string[], env: Record<string, string>): Promise<string> {
