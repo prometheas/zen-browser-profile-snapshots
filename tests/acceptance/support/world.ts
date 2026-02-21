@@ -1,5 +1,6 @@
 import { setWorldConstructor, World } from "npm:@cucumber/cucumber@12.6.0";
 import { resolve } from "jsr:@std/path@1.1.4";
+import { buildScenarioEnv } from "./world-env.ts";
 
 export class ZenWorld extends World {
   cwd = "";
@@ -28,9 +29,7 @@ export class ZenWorld extends World {
 
   async initWorkspace(): Promise<void> {
     this.cwd = await Deno.makeTempDir();
-    this.env = {
-      HOME: this.cwd,
-    };
+    this.env = buildScenarioEnv(this.env, this.cwd);
     this.now = undefined;
     this.retentionDaily = undefined;
     this.retentionWeekly = undefined;
