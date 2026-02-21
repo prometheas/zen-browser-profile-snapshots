@@ -1,5 +1,6 @@
 import { dirname, join } from "jsr:@std/path@1.1.4";
 import { loadConfig } from "../config.ts";
+import { toTomlStringLiteral } from "../core/toml-string.ts";
 import { installScheduler } from "../platform/scheduler.ts";
 import type { AppConfig, Platform, RuntimeOptions } from "../types.ts";
 
@@ -166,21 +167,23 @@ async function detectCloudPath(options: RuntimeOptions, os: Platform): Promise<s
 }
 
 function toToml(config: AppConfig): string {
-  const cloudLine = config.backup.cloud_path ? `cloud_path = "${config.backup.cloud_path}"\n` : "";
+  const cloudLine = config.backup.cloud_path
+    ? `cloud_path = ${toTomlStringLiteral(config.backup.cloud_path)}\n`
+    : "";
   return `[profile]
-path = "${config.profile.path}"
+path = ${toTomlStringLiteral(config.profile.path)}
 
 [backup]
-local_path = "${config.backup.local_path}"
+local_path = ${toTomlStringLiteral(config.backup.local_path)}
 ${cloudLine}
 [retention]
 daily_days = ${config.retention.daily_days}
 weekly_days = ${config.retention.weekly_days}
 
 [schedule]
-daily_time = "${config.schedule.daily_time}"
-weekly_day = "${config.schedule.weekly_day}"
-weekly_time = "${config.schedule.weekly_time}"
+daily_time = ${toTomlStringLiteral(config.schedule.daily_time)}
+weekly_day = ${toTomlStringLiteral(config.schedule.weekly_day)}
+weekly_time = ${toTomlStringLiteral(config.schedule.weekly_time)}
 
 [notifications]
 enabled = ${config.notifications.enabled}
