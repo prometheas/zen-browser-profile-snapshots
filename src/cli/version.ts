@@ -14,3 +14,34 @@ export async function resolveVersion(): Promise<string> {
   }
   return "dev";
 }
+
+export interface VersionDisplayParts {
+  semver: string;
+  suffix?: string;
+  hash?: string;
+}
+
+export function parseVersionForDisplay(version: string): VersionDisplayParts {
+  const cleaned = version.trim();
+  const describeMatch = cleaned.match(
+    /^v?(\d+\.\d+\.\d+)(?:-([0-9A-Za-z.-]+))?-\d+-g([0-9a-fA-F]+)(?:-dirty)?$/,
+  );
+  if (describeMatch) {
+    const [, semver, suffix, hash] = describeMatch;
+    return {
+      semver,
+      suffix: suffix || undefined,
+      hash: hash || undefined,
+    };
+  }
+
+  const taggedMatch = cleaned.match(/^v?(\d+\.\d+\.\d+)(?:-([0-9A-Za-z.-]+))?$/);
+  if (taggedMatch) {
+    const [, semver, suffix] = taggedMatch;
+    return {
+      semver,
+      suffix: suffix || undefined,
+    };
+  }
+  return { semver: cleaned };
+}

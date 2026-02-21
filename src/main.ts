@@ -1,5 +1,5 @@
 import { isHelpFlag, renderHelp } from "./cli/help.ts";
-import { resolveVersion } from "./cli/version.ts";
+import { parseVersionForDisplay, resolveVersion } from "./cli/version.ts";
 import { runBackup } from "./commands/backup.ts";
 import { runInstall } from "./commands/install.ts";
 import { runList } from "./commands/list.ts";
@@ -145,6 +145,13 @@ if (import.meta.main) {
 }
 
 function formatVersionOutput(version: string, color: boolean): string {
-  if (!color) return `zen-backup ${version}`;
-  return `\u001b[2mzen-backup\u001b[0m \u001b[36m${version}\u001b[0m`;
+  const parsed = parseVersionForDisplay(version);
+  const parts = [`zen-backup ${parsed.semver}`];
+  if (parsed.suffix) {
+    parts.push(color ? `\u001b[1m${parsed.suffix}\u001b[0m` : parsed.suffix);
+  }
+  if (parsed.hash) {
+    parts.push(color ? `\u001b[90m#${parsed.hash}\u001b[0m` : `#${parsed.hash}`);
+  }
+  return parts.join(" ");
 }
