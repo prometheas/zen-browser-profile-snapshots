@@ -30,15 +30,8 @@ jobs:
         run: |
           deno task lint
           deno task typecheck
-          deno task test:unit
-          deno task test:integration
+          deno task test--unit
+          deno task test--integration
 
       - name: Linux acceptance (platform)
-        run: |
-          deno run -A npm:@cucumber/cucumber@12.6.0 \
-            --import tests/acceptance/support/world.ts \
-            --import tests/acceptance/steps/index.ts \
-            --tags '@linux' \
-            docs/features/platform/install.feature \
-            docs/features/platform/scheduling.feature \
-            docs/features/platform/notifications.feature
+        run: deno task test--acceptance--platform--linux

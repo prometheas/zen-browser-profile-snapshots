@@ -19,10 +19,10 @@ Run from repo root:
 
 - `deno task lint`
 - `deno task typecheck`
-- `deno task test:unit`
-- `deno task test:integration`
-- `deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts --tags '@linux' docs/features/platform/install.feature docs/features/platform/scheduling.feature docs/features/platform/notifications.feature`
-- `deno task release:linux`
+- `deno task test--unit`
+- `deno task test--integration`
+- `deno task test--acceptance--platform--linux`
+- `deno task release--linux`
 
 ## CI Gate
 

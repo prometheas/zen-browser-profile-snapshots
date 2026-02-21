@@ -90,8 +90,8 @@ install -m 0755 ./zen-backup-<target> /usr/local/bin/zen-backup
 
 ### Build from source (requires Deno 2)
 
-- `deno task build:macos`
-- `deno task build:linux`
+- `deno task build--macos`
+- `deno task build--linux`
 
 ## First-Time Setup
 
@@ -113,7 +113,7 @@ install -m 0755 ./zen-backup-<target> /usr/local/bin/zen-backup
   - `zen-backup status`
   - `zen-backup list`
 - Live scheduler smoke (macOS only):
-  - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:macos:scheduler`
+  - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test--smoke--macos--scheduler`
 
 Notes:
 
@@ -124,11 +124,11 @@ Notes:
 
 Use task aliases instead of long Cucumber commands:
 
-- `deno task test:acceptance`
-- `deno task test:acceptance:platform`
-- `deno task test:acceptance:platform:macos`
-- `deno task test:acceptance:platform:linux`
-- `deno task test:acceptance:platform:windows`
+- `deno task test--acceptance`
+- `deno task test--acceptance--platform`
+- `deno task test--acceptance--platform--macos`
+- `deno task test--acceptance--platform--linux`
+- `deno task test--acceptance--platform--windows`
 
 ## Feedback and Issues
 
@@ -150,11 +150,11 @@ Please include:
   commits):
   - push a `v*` tag (handled by `.github/workflows/release-combined.yml`)
 - Build macOS release artifacts (binaries + checksums + release notes):
-  - `deno task release:macos`
-  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:macos`
+  - `deno task release--macos`
+  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release--macos`
 - Build Linux release artifacts (binaries + checksums + release notes):
-  - `deno task release:linux`
-  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:linux`
+  - `deno task release--linux`
+  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release--linux`
 
 ## Docs
 

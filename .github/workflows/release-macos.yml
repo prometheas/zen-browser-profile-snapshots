@@ -27,9 +27,9 @@ jobs:
         run: |
           deno task lint
           deno task typecheck
-          deno task test:unit
-          deno task test:integration
-          deno task test:acceptance:m1
+          deno task test--unit
+          deno task test--integration
+          deno task test--acceptance--m1
 
       - name: Resolve release version
         id: version
@@ -45,7 +45,7 @@ jobs:
       - name: Build release artifacts
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
-        run: deno task release:macos
+        run: deno task release--macos
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4

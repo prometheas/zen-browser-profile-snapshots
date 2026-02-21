@@ -19,14 +19,14 @@ Run from repo root:
 
 - `deno task lint`
 - `deno task typecheck`
-- `deno task test:unit`
-- `deno task test:integration`
-- `deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts --tags '@macos' docs/features/platform/install.feature docs/features/platform/scheduling.feature docs/features/platform/notifications.feature`
-- `deno task release:macos`
+- `deno task test--unit`
+- `deno task test--integration`
+- `deno task test--acceptance--platform--macos`
+- `deno task release--macos`
 
 Optional live smoke on a macOS host:
 
-- `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:macos:scheduler`
+- `ZEN_BACKUP_LIVE_SMOKE=1 deno task test--smoke--macos--scheduler`
 
 ## Manual QA
 
