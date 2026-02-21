@@ -158,8 +158,12 @@ async function queryLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
   const weekly = join(agentsDir, `${WEEKLY_LABEL}.plist`);
   const dailyInstalled = await exists(daily);
   const weeklyInstalled = await exists(weekly);
+  const loadedMarker = join(agentsDir, ".zen-backup-loaded");
+  const markerLoaded = await exists(loadedMarker);
   let dailyPaused = false;
   let weeklyPaused = false;
+  let dailyLoaded = false;
+  let weeklyLoaded = false;
 
   if (await shouldUseRealLaunchctl(options)) {
     const domain = await launchctlDomain(options);
@@ -170,16 +174,24 @@ async function queryLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
       dailyPaused = labelDisabled(disabled, DAILY_LABEL);
       weeklyPaused = labelDisabled(disabled, WEEKLY_LABEL);
     }
-    if (dailyInstalled) await launchctlOptional(["print", `${domain}/${DAILY_LABEL}`], options);
-    if (weeklyInstalled) await launchctlOptional(["print", `${domain}/${WEEKLY_LABEL}`], options);
+    if (dailyInstalled) {
+      dailyLoaded = (await launchctlOptional(["print", `${domain}/${DAILY_LABEL}`], options)) !== null ||
+        markerLoaded;
+    }
+    if (weeklyInstalled) {
+      weeklyLoaded = (await launchctlOptional(["print", `${domain}/${WEEKLY_LABEL}`], options)) !== null ||
+        markerLoaded;
+    }
   } else {
     dailyPaused = await exists(join(agentsDir, `.disabled-${DAILY_LABEL}`));
     weeklyPaused = await exists(join(agentsDir, `.disabled-${WEEKLY_LABEL}`));
+    dailyLoaded = markerLoaded && dailyInstalled;
+    weeklyLoaded = markerLoaded && weeklyInstalled;
   }
 
   const states: Record<string, "active" | "paused" | "not_installed"> = {};
-  states[DAILY_LABEL] = !dailyInstalled ? "not_installed" : dailyPaused ? "paused" : "active";
-  states[WEEKLY_LABEL] = !weeklyInstalled ? "not_installed" : weeklyPaused ? "paused" : "active";
+  states[DAILY_LABEL] = resolveState(dailyInstalled, dailyPaused, dailyLoaded);
+  states[WEEKLY_LABEL] = resolveState(weeklyInstalled, weeklyPaused, weeklyLoaded);
   return {
     installed: dailyInstalled && weeklyInstalled,
     labels: dailyInstalled || weeklyInstalled ? [DAILY_LABEL, WEEKLY_LABEL] : [],
@@ -273,6 +285,17 @@ function commandEnv(options: RuntimeOptions): Record<string, string> | undefined
   const env = options.env;
   if (!env) return undefined;
   return Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<string, string>;
+}
+
+function resolveState(
+  installed: boolean,
+  paused: boolean,
+  loaded: boolean,
+): "active" | "paused" | "not_installed" {
+  if (!installed) return "not_installed";
+  if (paused) return "paused";
+  if (!loaded) return "paused";
+  return "active";
 }
 
 function hourFromTime(time: string): number {

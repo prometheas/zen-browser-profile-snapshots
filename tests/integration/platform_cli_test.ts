@@ -77,6 +77,36 @@ Deno.test("schedule start/stop/status and aliases work", async () => {
   assertStringIncludes(status.stdout, "com.prometheas.zen-backup.daily");
 });
 
+Deno.test("schedule start/stop are idempotent", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const profilePath = join(tempDir, "Library", "Application Support", "zen", "Profiles", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+  await runCli(["install"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+
+  const firstStop = await runCli(["schedule", "stop"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(firstStop.exitCode, 0);
+  assertStringIncludes(firstStop.stdout, "paused");
+
+  const secondStop = await runCli(["schedule", "stop"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(secondStop.exitCode, 0);
+  assertStringIncludes(secondStop.stdout, "paused");
+
+  const firstStart = await runCli(["schedule", "start"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(firstStart.exitCode, 0);
+  assertStringIncludes(firstStart.stdout, "active");
+
+  const secondStart = await runCli(["schedule", "start"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(secondStart.exitCode, 0);
+  assertStringIncludes(secondStart.stdout, "active");
+});
+
+Deno.test("schedule status reports no jobs before install", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const result = await runCli(["schedule", "status"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stdout, "No scheduled jobs");
+});
+
 Deno.test("backup writes notifications when browser running and cloud sync fails", async () => {
   const tempDir = await Deno.makeTempDir();
   const profileDir = join(tempDir, "profile");
