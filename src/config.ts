@@ -1,7 +1,7 @@
 import { dirname, join, resolve } from "jsr:@std/path@1.1.4";
 import { parse as parseToml } from "jsr:@std/toml@1.0.11";
 import { CliError } from "./errors.ts";
-import { expandPath, resolveHomeDir } from "./core/path_utils.ts";
+import { expandPath, resolveHomeDir } from "./core/path-utils.ts";
 import type { AppConfig, Platform, RuntimeOptions } from "./types.ts";
 
 export interface ConfigLoadOptions extends RuntimeOptions {

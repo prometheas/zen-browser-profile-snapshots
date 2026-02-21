@@ -6,7 +6,7 @@ import {
   formatSize,
   listArchives,
   newestArchive,
-} from "../core/archive_inventory.ts";
+} from "../core/archive-inventory.ts";
 import { queryScheduler } from "../platform/scheduler.ts";
 import type { RuntimeOptions } from "../types.ts";
 

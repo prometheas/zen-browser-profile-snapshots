@@ -1,6 +1,6 @@
 import { loadConfig } from "../config.ts";
 import { CliError } from "../errors.ts";
-import { formatSize, listArchives, sortByChronologicalName } from "../core/archive_inventory.ts";
+import { formatSize, listArchives, sortByChronologicalName } from "../core/archive-inventory.ts";
 import type { RuntimeOptions } from "../types.ts";
 
 export async function runList(options: RuntimeOptions = {}): Promise<{

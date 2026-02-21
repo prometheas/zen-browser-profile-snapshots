@@ -1,5 +1,5 @@
 import { join } from "jsr:@std/path@1.1.4";
-import { archiveDate } from "./archive_inventory.ts";
+import { archiveDate } from "./archive-inventory.ts";
 
 export async function pruneArchives(
   root: string,

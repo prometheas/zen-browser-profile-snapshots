@@ -1,7 +1,7 @@
 import { basename, join } from "jsr:@std/path@1.1.4";
 import { createProfileArchive } from "../archive.ts";
 import { loadConfig } from "../config.ts";
-import { nextArchivePath } from "../core/archive_naming.ts";
+import { nextArchivePath } from "../core/archive-naming.ts";
 import { pruneArchives } from "../core/retention.ts";
 import { CliError } from "../errors.ts";
 import { appendLog } from "../log.ts";
