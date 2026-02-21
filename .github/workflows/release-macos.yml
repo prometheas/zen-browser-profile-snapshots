@@ -1,9 +1,6 @@
 name: Release macOS
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       release_version:
@@ -60,13 +57,6 @@ jobs:
             dist/checksums-macos.txt
             dist/release-notes-macos.md
 
-      - name: Publish GitHub release
+      - name: Publish GitHub release (manual fallback)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          body_path: dist/release-notes-macos.md
-          files: |
-            dist/zen-backup-aarch64-apple-darwin
-            dist/zen-backup-x86_64-apple-darwin
-            dist/checksums-macos.txt
+        run: echo "Combined release is handled by release-combined.yml"

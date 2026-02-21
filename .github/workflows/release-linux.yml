@@ -1,9 +1,6 @@
 name: Release Linux
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       release_version:
@@ -71,13 +68,6 @@ jobs:
             dist/checksums-linux.txt
             dist/release-notes-linux.md
 
-      - name: Publish GitHub release
+      - name: Publish GitHub release (manual fallback)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          body_path: dist/release-notes-linux.md
-          files: |
-            dist/zen-backup-x86_64-unknown-linux-gnu
-            dist/zen-backup-aarch64-unknown-linux-gnu
-            dist/checksums-linux.txt
+        run: echo "Combined release is handled by release-combined.yml"
