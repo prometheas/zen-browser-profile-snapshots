@@ -124,6 +124,9 @@ Please include:
 
 ## Packaging (Maintainers)
 
+- Combined tagged release (macOS + Linux artifacts, unified release notes from conventional
+  commits):
+  - push a `v*` tag (handled by `.github/workflows/release-combined.yml`)
 - Build macOS release artifacts (binaries + checksums + release notes):
   - `deno task release:macos`
   - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:macos`

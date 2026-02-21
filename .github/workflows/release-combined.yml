@@ -1,0 +1,155 @@
+name: Release Combined
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Version label for release notes (example: v0.3.0-beta.1)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  resolve-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Resolve release version
+        id: version
+        run: |
+          if [ -n "${{ inputs.release_version }}" ]; then
+            echo "value=${{ inputs.release_version }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-macos:
+    needs: resolve-version
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.6.9
+
+      - name: Validate macOS scope
+        run: |
+          deno task lint
+          deno task typecheck
+          deno task test:unit
+          deno task test:integration
+          deno task test:acceptance:m1
+
+      - name: Build macOS artifacts
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.value }}
+        run: deno task release:macos
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zen-backup-macos-${{ needs.resolve-version.outputs.value }}
+          path: |
+            dist/zen-backup-aarch64-apple-darwin
+            dist/zen-backup-x86_64-apple-darwin
+            dist/checksums-macos.txt
+
+  build-linux:
+    needs: resolve-version
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.6.9
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+
+      - name: Validate Linux scope
+        run: |
+          deno task lint
+          deno task typecheck
+          deno task test:unit
+          deno task test:integration
+          deno run -A npm:@cucumber/cucumber@12.6.0 \
+            --import tests/acceptance/support/world.ts \
+            --import tests/acceptance/steps/index.ts \
+            --tags '@linux' \
+            docs/features/platform/install.feature \
+            docs/features/platform/scheduling.feature \
+            docs/features/platform/notifications.feature
+
+      - name: Build Linux artifacts
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.value }}
+        run: deno task release:linux
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zen-backup-linux-${{ needs.resolve-version.outputs.value }}
+          path: |
+            dist/zen-backup-x86_64-unknown-linux-gnu
+            dist/zen-backup-aarch64-unknown-linux-gnu
+            dist/checksums-linux.txt
+
+  publish-release:
+    needs: [resolve-version, build-macos, build-linux]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.6.9
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Compose combined release notes
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.value }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: deno run -A scripts/generate-combined-release-notes.ts
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-version.outputs.value }}
+          body_path: dist/release-notes.md
+          files: |
+            dist/zen-backup-aarch64-apple-darwin
+            dist/zen-backup-x86_64-apple-darwin
+            dist/zen-backup-x86_64-unknown-linux-gnu
+            dist/zen-backup-aarch64-unknown-linux-gnu
+            dist/checksums-macos.txt
+            dist/checksums-linux.txt
+          overwrite_files: true
