@@ -82,6 +82,7 @@ The specs are the source of truth:
 - `docs/product/constitution.md`
 - `docs/product/user-stories.md`
 - `docs/features/`
+- `docs/releases/macos-beta-checklist.md`
 
 ## Planned Repo Layout
 
