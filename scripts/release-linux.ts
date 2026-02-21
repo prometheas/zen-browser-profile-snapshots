@@ -11,7 +11,11 @@ if (import.meta.main) {
   for (const target of targets) {
     const outputPath = artifactPath(distDir, target);
     await compileBinary(target, outputPath);
-    await smokeCheckBinary(outputPath);
+    if (canExecuteOnCurrentHost(target)) {
+      await smokeCheckBinary(outputPath);
+    } else {
+      console.log(`Skipping smoke check for ${target} on ${Deno.build.arch}-${Deno.build.os}`);
+    }
     artifacts.push({ path: outputPath, target });
   }
 
@@ -66,6 +70,13 @@ async function smokeCheckBinary(path: string): Promise<void> {
   if (out.code !== 1 || !stderr.includes("Usage: zen-backup")) {
     throw new Error(`smoke check failed for ${path}`);
   }
+}
+
+function canExecuteOnCurrentHost(target: string): boolean {
+  if (Deno.build.os !== "linux") return false;
+  if (target.startsWith("x86_64-") && Deno.build.arch === "x86_64") return true;
+  if (target.startsWith("aarch64-") && Deno.build.arch === "aarch64") return true;
+  return false;
 }
 
 function renderLinuxReleaseNotes(
