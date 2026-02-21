@@ -1,5 +1,5 @@
 import { dirname, join } from "jsr:@std/path@1.1.4";
-import { loadConfig } from "../config.ts";
+import { loadConfig, resolveConfigPath } from "../config.ts";
 import { toTomlStringLiteral } from "../core/toml-string.ts";
 import { installScheduler } from "../platform/scheduler.ts";
 import type { AppConfig, Platform, RuntimeOptions } from "../types.ts";
@@ -16,7 +16,11 @@ export async function runInstall(options: RuntimeOptions = {}): Promise<{
     const runtimeEnv = options.env ?? Deno.env.toObject();
     const os = options.os ?? (Deno.build.os as Platform);
     const home = runtimeEnv.HOME ?? runtimeEnv.USERPROFILE ?? Deno.cwd();
-    const configPath = resolveConfigPathForInstall(os, home, runtimeEnv);
+    const configPath = resolveConfigPath({
+      cwd: options.cwd ?? Deno.cwd(),
+      os,
+      env: runtimeEnv,
+    });
     await Deno.mkdir(dirname(configPath), { recursive: true });
 
     if (options.env?.ZEN_BACKUP_SIMULATE_CONFIG_PERMISSION_DENIED === "1") {
@@ -200,18 +204,6 @@ function defaultBackupPath(
     return join(user, "zen-backups");
   }
   return join(home, "zen-backups");
-}
-
-function resolveConfigPathForInstall(
-  os: Platform,
-  home: string,
-  env: Record<string, string | undefined> | undefined,
-): string {
-  if (os === "windows") {
-    const appData = env?.APPDATA ?? join(home, "AppData", "Roaming");
-    return join(appData, "zen-profile-backup", "settings.toml");
-  }
-  return join(home, ".config", "zen-profile-backup", "settings.toml");
 }
 
 async function exists(path: string): Promise<boolean> {

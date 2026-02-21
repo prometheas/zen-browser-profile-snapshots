@@ -126,6 +126,25 @@ Deno.test("install uses process HOME when runtime env is not overridden", async 
   }
 });
 
+Deno.test("install honors ZEN_BACKUP_CONFIG override", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const profilePath = join(tempDir, "Library", "Application Support", "zen", "Profiles", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+
+  const result = await runCli(["install"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: {
+      HOME: tempDir,
+      ZEN_BACKUP_CONFIG: "custom/smoke-settings.toml",
+      ZEN_BACKUP_FORCE_NO_TERMINAL_NOTIFIER: "1",
+    },
+  });
+
+  assertEquals(result.exitCode, 0);
+  assertEquals(await exists(join(tempDir, "custom", "smoke-settings.toml")), true);
+});
+
 Deno.test("uninstall removes schedule and settings, and preserves backups by default", async () => {
   const tempDir = await Deno.makeTempDir();
   const profilePath = join(tempDir, "Library", "Application Support", "zen", "Profiles", "default");

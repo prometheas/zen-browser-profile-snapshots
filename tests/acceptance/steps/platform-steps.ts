@@ -232,7 +232,7 @@ When("the user selects {string}", async function (this: ZenWorld, choice: string
 });
 
 When("the scheduler is queried", async function (this: ZenWorld) {
-  const result = await runCli(["status"], {
+  const result = await runCli(["schedule", "status"], {
     cwd: this.cwd,
     os: targetOs(this),
     env: this.envWithHome(),
