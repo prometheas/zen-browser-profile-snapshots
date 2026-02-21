@@ -17,7 +17,8 @@ export interface CliResult {
 
 export async function runCli(args: string[], options: RuntimeOptions = {}): Promise<CliResult> {
   const env = options.env ?? Deno.env.toObject();
-  const color = env.NO_COLOR !== "1" && !Deno.noColor;
+  const forceColor = env.CLICOLOR_FORCE === "1";
+  const color = forceColor || (env.NO_COLOR !== "1" && !Deno.noColor);
 
   if (args.length === 0) {
     return {
@@ -40,7 +41,7 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       : await resolveVersion();
     return {
       exitCode: 0,
-      stdout: `zen-backup ${version}`,
+      stdout: formatVersionOutput(version, color),
       stderr: "",
     };
   }
@@ -141,4 +142,9 @@ if (import.meta.main) {
     console.error(result.stderr);
   }
   Deno.exit(result.exitCode);
+}
+
+function formatVersionOutput(version: string, color: boolean): string {
+  if (!color) return `zen-backup ${version}`;
+  return `\u001b[2mzen-backup\u001b[0m \u001b[36m${version}\u001b[0m`;
 }
