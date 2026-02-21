@@ -42,6 +42,7 @@
     "build:linux": "deno task build:linux:x64 && deno task build:linux:arm64",
     "release:macos": "deno run -A scripts/task--release-macos.ts",
     "release:linux": "deno run -A scripts/task--release-linux.ts",
-    "test:smoke:macos:scheduler": "deno run -A scripts/task--test--smoke--macos--scheduler.ts"
+    "test:smoke:macos:scheduler": "deno run -A scripts/task--test--smoke--macos--scheduler.ts",
+    "test:smoke:windows:scheduler": "deno run -A scripts/task--test--smoke--windows--scheduler.ts"
   }
 }

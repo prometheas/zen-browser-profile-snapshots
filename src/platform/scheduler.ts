@@ -377,85 +377,128 @@ async function installWindows(
   config: AppConfig,
   options: RuntimeOptions,
 ): Promise<SchedulerStatus> {
+  if (await shouldUseRealWindowsScheduler(options)) {
+    return await installWindowsReal(config, options);
+  }
+  return await installWindowsSimulated(config, options);
+}
+
+async function installWindowsSimulated(
+  config: AppConfig,
+  options: RuntimeOptions,
+): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
   const schedulerDir = resolveWindowsSchedulerDir(options);
   await Deno.mkdir(schedulerDir, { recursive: true });
 
-  await writeWindowsTask(schedulerDir, DAILY_TASK, {
+  await writeWindowsTask(schedulerDir, names.daily, {
     kind: "daily",
     dailyTime: config.schedule.daily_time,
     weeklyDay: undefined,
     weeklyTime: undefined,
   });
-  await writeWindowsTask(schedulerDir, WEEKLY_TASK, {
+  await writeWindowsTask(schedulerDir, names.weekly, {
     kind: "weekly",
     dailyTime: undefined,
     weeklyDay: config.schedule.weekly_day,
     weeklyTime: config.schedule.weekly_time,
   });
 
-  await Deno.remove(join(schedulerDir, `.disabled-${DAILY_TASK}`)).catch(() => undefined);
-  await Deno.remove(join(schedulerDir, `.disabled-${WEEKLY_TASK}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${names.daily}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${names.weekly}`)).catch(() => undefined);
   await Deno.writeTextFile(join(schedulerDir, ".zen-backup-loaded"), "1");
 
   return await queryWindows(options);
 }
 
 async function uninstallWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
+  if (await shouldUseRealWindowsScheduler(options)) {
+    return await uninstallWindowsReal(options);
+  }
+  return await uninstallWindowsSimulated(options);
+}
+
+async function uninstallWindowsSimulated(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
   const schedulerDir = resolveWindowsSchedulerDir(options);
   await Deno.remove(join(schedulerDir, ".zen-backup-loaded")).catch(() => undefined);
-  await Deno.remove(join(schedulerDir, `${DAILY_TASK}.json`)).catch(() => undefined);
-  await Deno.remove(join(schedulerDir, `${WEEKLY_TASK}.json`)).catch(() => undefined);
-  await Deno.remove(join(schedulerDir, `.disabled-${DAILY_TASK}`)).catch(() => undefined);
-  await Deno.remove(join(schedulerDir, `.disabled-${WEEKLY_TASK}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `${names.daily}.json`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `${names.weekly}.json`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${names.daily}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${names.weekly}`)).catch(() => undefined);
 
   return {
     installed: false,
     labels: [],
     states: {
-      [DAILY_TASK]: "not_installed",
-      [WEEKLY_TASK]: "not_installed",
+      [names.daily]: "not_installed",
+      [names.weekly]: "not_installed",
     },
   };
 }
 
 async function startWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
+  if (await shouldUseRealWindowsScheduler(options)) {
+    return await startWindowsReal(options);
+  }
+  return await startWindowsSimulated(options);
+}
+
+async function startWindowsSimulated(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
   const schedulerDir = resolveWindowsSchedulerDir(options);
-  const dailyTaskPath = join(schedulerDir, `${DAILY_TASK}.json`);
-  const weeklyTaskPath = join(schedulerDir, `${WEEKLY_TASK}.json`);
+  const dailyTaskPath = join(schedulerDir, `${names.daily}.json`);
+  const weeklyTaskPath = join(schedulerDir, `${names.weekly}.json`);
   const hasTasks = await exists(dailyTaskPath) && await exists(weeklyTaskPath);
   if (!hasTasks) return await queryWindows(options);
 
-  await Deno.remove(join(schedulerDir, `.disabled-${DAILY_TASK}`)).catch(() => undefined);
-  await Deno.remove(join(schedulerDir, `.disabled-${WEEKLY_TASK}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${names.daily}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${names.weekly}`)).catch(() => undefined);
   await Deno.writeTextFile(join(schedulerDir, ".zen-backup-loaded"), "1");
   return await queryWindows(options);
 }
 
 async function stopWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
+  if (await shouldUseRealWindowsScheduler(options)) {
+    return await stopWindowsReal(options);
+  }
+  return await stopWindowsSimulated(options);
+}
+
+async function stopWindowsSimulated(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
   const schedulerDir = resolveWindowsSchedulerDir(options);
-  const dailyTaskPath = join(schedulerDir, `${DAILY_TASK}.json`);
-  const weeklyTaskPath = join(schedulerDir, `${WEEKLY_TASK}.json`);
+  const dailyTaskPath = join(schedulerDir, `${names.daily}.json`);
+  const weeklyTaskPath = join(schedulerDir, `${names.weekly}.json`);
   const hasTasks = await exists(dailyTaskPath) && await exists(weeklyTaskPath);
   if (!hasTasks) return await queryWindows(options);
 
-  await Deno.writeTextFile(join(schedulerDir, `.disabled-${DAILY_TASK}`), "1");
-  await Deno.writeTextFile(join(schedulerDir, `.disabled-${WEEKLY_TASK}`), "1");
+  await Deno.writeTextFile(join(schedulerDir, `.disabled-${names.daily}`), "1");
+  await Deno.writeTextFile(join(schedulerDir, `.disabled-${names.weekly}`), "1");
   await Deno.writeTextFile(join(schedulerDir, ".zen-backup-loaded"), "1");
   return await queryWindows(options);
 }
 
 async function queryWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
+  if (await shouldUseRealWindowsScheduler(options)) {
+    return await queryWindowsReal(options);
+  }
+  return await queryWindowsSimulated(options);
+}
+
+async function queryWindowsSimulated(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
   const schedulerDir = resolveWindowsSchedulerDir(options);
-  const dailyTaskPath = join(schedulerDir, `${DAILY_TASK}.json`);
-  const weeklyTaskPath = join(schedulerDir, `${WEEKLY_TASK}.json`);
+  const dailyTaskPath = join(schedulerDir, `${names.daily}.json`);
+  const weeklyTaskPath = join(schedulerDir, `${names.weekly}.json`);
   const dailyInstalled = await exists(dailyTaskPath);
   const weeklyInstalled = await exists(weeklyTaskPath);
   const markerLoaded = await exists(join(schedulerDir, ".zen-backup-loaded"));
-  const dailyPaused = await exists(join(schedulerDir, `.disabled-${DAILY_TASK}`));
-  const weeklyPaused = await exists(join(schedulerDir, `.disabled-${WEEKLY_TASK}`));
+  const dailyPaused = await exists(join(schedulerDir, `.disabled-${names.daily}`));
+  const weeklyPaused = await exists(join(schedulerDir, `.disabled-${names.weekly}`));
   const states: Record<string, "active" | "paused" | "not_installed"> = {};
-  states[DAILY_TASK] = resolveState(dailyInstalled, dailyPaused, markerLoaded && dailyInstalled);
-  states[WEEKLY_TASK] = resolveState(
+  states[names.daily] = resolveState(dailyInstalled, dailyPaused, markerLoaded && dailyInstalled);
+  states[names.weekly] = resolveState(
     weeklyInstalled,
     weeklyPaused,
     markerLoaded && weeklyInstalled,
@@ -463,7 +506,98 @@ async function queryWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
 
   return {
     installed: dailyInstalled && weeklyInstalled,
-    labels: dailyInstalled || weeklyInstalled ? [DAILY_TASK, WEEKLY_TASK] : [],
+    labels: dailyInstalled || weeklyInstalled ? [names.daily, names.weekly] : [],
+    states,
+  };
+}
+
+async function installWindowsReal(
+  config: AppConfig,
+  options: RuntimeOptions,
+): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
+  await schtasks(
+    [
+      "/Create",
+      "/TN",
+      names.daily,
+      "/TR",
+      "zen-backup backup daily",
+      "/SC",
+      "DAILY",
+      "/ST",
+      normalizeWindowsTime(config.schedule.daily_time),
+      "/F",
+    ],
+    options,
+  );
+  await schtasks(
+    [
+      "/Create",
+      "/TN",
+      names.weekly,
+      "/TR",
+      "zen-backup backup weekly",
+      "/SC",
+      "WEEKLY",
+      "/D",
+      windowsWeekday(config.schedule.weekly_day),
+      "/ST",
+      normalizeWindowsTime(config.schedule.weekly_time),
+      "/F",
+    ],
+    options,
+  );
+  return await queryWindowsReal(options);
+}
+
+async function uninstallWindowsReal(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
+  await schtasksOptional(["/Delete", "/TN", names.daily, "/F"], options);
+  await schtasksOptional(["/Delete", "/TN", names.weekly, "/F"], options);
+  return {
+    installed: false,
+    labels: [],
+    states: {
+      [names.daily]: "not_installed",
+      [names.weekly]: "not_installed",
+    },
+  };
+}
+
+async function startWindowsReal(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
+  const daily = await queryWindowsTaskReal(names.daily, options);
+  const weekly = await queryWindowsTaskReal(names.weekly, options);
+  if (!daily.installed && !weekly.installed) return await queryWindowsReal(options);
+  if (daily.installed) await schtasks(["/Change", "/TN", names.daily, "/ENABLE"], options);
+  if (weekly.installed) await schtasks(["/Change", "/TN", names.weekly, "/ENABLE"], options);
+  return await queryWindowsReal(options);
+}
+
+async function stopWindowsReal(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
+  const daily = await queryWindowsTaskReal(names.daily, options);
+  const weekly = await queryWindowsTaskReal(names.weekly, options);
+  if (!daily.installed && !weekly.installed) return await queryWindowsReal(options);
+  if (daily.installed) await schtasks(["/Change", "/TN", names.daily, "/DISABLE"], options);
+  if (weekly.installed) await schtasks(["/Change", "/TN", names.weekly, "/DISABLE"], options);
+  return await queryWindowsReal(options);
+}
+
+async function queryWindowsReal(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const names = windowsTaskNames(options);
+  const daily = await queryWindowsTaskReal(names.daily, options);
+  const weekly = await queryWindowsTaskReal(names.weekly, options);
+
+  const states: Record<string, "active" | "paused" | "not_installed"> = {
+    [names.daily]: daily.installed ? (daily.enabled ? "active" : "paused") : "not_installed",
+    [names.weekly]: weekly.installed ? (weekly.enabled ? "active" : "paused") : "not_installed",
+  };
+
+  return {
+    installed: daily.installed && weekly.installed,
+    labels: daily.installed || weekly.installed ? [names.daily, names.weekly] : [],
     states,
   };
 }
@@ -471,6 +605,14 @@ async function queryWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
 function resolveHome(options: RuntimeOptions): string {
   const env = options.env ?? Deno.env.toObject();
   return env.HOME ?? env.USERPROFILE ?? Deno.cwd();
+}
+
+function windowsTaskNames(options: RuntimeOptions): { daily: string; weekly: string } {
+  const prefix = options.env?.ZEN_BACKUP_WINDOWS_TASK_PREFIX?.trim();
+  if (!prefix) {
+    return { daily: DAILY_TASK, weekly: WEEKLY_TASK };
+  }
+  return { daily: `${prefix}Daily`, weekly: `${prefix}Weekly` };
 }
 
 function resolveWindowsSchedulerDir(options: RuntimeOptions): string {
@@ -500,6 +642,133 @@ async function writeWindowsTask(
     },
   };
   await Deno.writeTextFile(join(schedulerDir, `${name}.json`), JSON.stringify(payload, null, 2));
+}
+
+async function shouldUseRealWindowsScheduler(options: RuntimeOptions): Promise<boolean> {
+  if (options.env?.ZEN_BACKUP_FORCE_SIMULATED_WINDOWS_SCHEDULER === "1") {
+    return false;
+  }
+  const os = options.os ?? (Deno.build.os as Platform);
+  if (os !== "windows") return false;
+
+  const processHome = Deno.env.get("USERPROFILE") ?? Deno.env.get("HOME");
+  const runtimeHome = resolveHome(options);
+  if (processHome && processHome !== runtimeHome) return false;
+
+  const processAppData = Deno.env.get("APPDATA");
+  const runtimeAppData = options.env?.APPDATA;
+  if (processAppData && runtimeAppData && processAppData !== runtimeAppData) return false;
+
+  if (!(await commandExistsWindows("schtasks", options))) return false;
+  return (await commandExistsWindows("powershell", options)) ||
+    (await commandExistsWindows("pwsh", options));
+}
+
+async function queryWindowsTaskReal(
+  taskName: string,
+  options: RuntimeOptions,
+): Promise<{ installed: boolean; enabled: boolean }> {
+  const script = `$task = Get-ScheduledTask -TaskName '${
+    escapePowerShellSingleQuoted(taskName)
+  }' -ErrorAction SilentlyContinue; if ($null -eq $task) { '{"installed":false,"enabled":false}' } else { [pscustomobject]@{installed=$true;enabled=[bool]$task.Settings.Enabled} | ConvertTo-Json -Compress }`;
+  const json = await powerShellOptional(script, options);
+  if (!json) return { installed: false, enabled: false };
+  try {
+    const parsed = JSON.parse(json.trim()) as { installed?: boolean; enabled?: boolean };
+    return {
+      installed: parsed.installed === true,
+      enabled: parsed.enabled === true,
+    };
+  } catch {
+    return { installed: false, enabled: false };
+  }
+}
+
+async function schtasks(args: string[], options: RuntimeOptions): Promise<string> {
+  const out = await new Deno.Command("schtasks", {
+    args,
+    env: commandEnv(options),
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  if (!out.success) {
+    const stderr = new TextDecoder().decode(out.stderr).trim();
+    throw new Error(`schtasks ${args.join(" ")} failed: ${stderr}`);
+  }
+  return new TextDecoder().decode(out.stdout);
+}
+
+async function schtasksOptional(args: string[], options: RuntimeOptions): Promise<string | null> {
+  try {
+    const out = await new Deno.Command("schtasks", {
+      args,
+      env: commandEnv(options),
+      stdout: "piped",
+      stderr: "null",
+    }).output();
+    if (!out.success) return null;
+    return new TextDecoder().decode(out.stdout);
+  } catch {
+    return null;
+  }
+}
+
+async function commandExistsWindows(binary: string, options: RuntimeOptions): Promise<boolean> {
+  try {
+    const out = await new Deno.Command("where", {
+      args: [binary],
+      env: commandEnv(options),
+      stdout: "null",
+      stderr: "null",
+    }).output();
+    return out.success;
+  } catch {
+    return false;
+  }
+}
+
+async function powerShellOptional(script: string, options: RuntimeOptions): Promise<string | null> {
+  for (const binary of ["powershell", "pwsh"]) {
+    try {
+      const out = await new Deno.Command(binary, {
+        args: ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+        env: commandEnv(options),
+        stdout: "piped",
+        stderr: "null",
+      }).output();
+      if (out.success) return new TextDecoder().decode(out.stdout);
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
+}
+
+function escapePowerShellSingleQuoted(value: string): string {
+  return value.replaceAll("'", "''");
+}
+
+function windowsWeekday(day: string): string {
+  const normalized = day.toLowerCase();
+  const map: Record<string, string> = {
+    sunday: "SUN",
+    monday: "MON",
+    tuesday: "TUE",
+    wednesday: "WED",
+    thursday: "THU",
+    friday: "FRI",
+    saturday: "SAT",
+  };
+  return map[normalized] ?? "SUN";
+}
+
+function normalizeWindowsTime(value: string): string {
+  const [hoursRaw = "00", minutesRaw = "00"] = value.split(":");
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+  const hh = Number.isFinite(hours) ? String(hours).padStart(2, "0") : "00";
+  const mm = Number.isFinite(minutes) ? String(minutes).padStart(2, "0") : "00";
+  return `${hh}:${mm}`;
 }
 
 async function shouldUseRealLaunchctl(options: RuntimeOptions): Promise<boolean> {

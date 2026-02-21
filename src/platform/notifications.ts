@@ -75,11 +75,50 @@ async function notifyWindows(options: NotifyOptions): Promise<string> {
     await appendNotificationWarning(options.backupRoot, "PowerShell toast notification failed");
     return "powershell-toast-failed";
   }
-  return "powershell-toast";
+
+  const script = buildWindowsToastScript(options.title, options.message);
+  const powershell = await runCommandWithTimeout(
+    "powershell",
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+    3000,
+  );
+  if (powershell.success) return "powershell-toast";
+
+  const pwsh = await runCommandWithTimeout(
+    "pwsh",
+    ["-NoProfile", "-NonInteractive", "-Command", script],
+    3000,
+  );
+  if (pwsh.success) return "powershell-toast";
+
+  await appendNotificationWarning(options.backupRoot, "PowerShell toast notification failed");
+  return "powershell-toast-failed";
 }
 
 function escapeAppleScript(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
+function buildWindowsToastScript(title: string, message: string): string {
+  const safeTitle = escapePowerShellSingleQuoted(title);
+  const safeMessage = escapePowerShellSingleQuoted(message);
+  return [
+    "$ErrorActionPreference='Stop'",
+    "Add-Type -AssemblyName System.Runtime.WindowsRuntime",
+    "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] > $null",
+    "$template=[Windows.UI.Notifications.ToastTemplateType]::ToastText02",
+    "$xml=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent($template)",
+    "$nodes=$xml.GetElementsByTagName('text')",
+    `$nodes.Item(0).AppendChild($xml.CreateTextNode('${safeTitle}')) > $null`,
+    `$nodes.Item(1).AppendChild($xml.CreateTextNode('${safeMessage}')) > $null`,
+    "$toast=[Windows.UI.Notifications.ToastNotification]::new($xml)",
+    "$notifier=[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('zen-backup')",
+    "$notifier.Show($toast)",
+  ].join(";");
+}
+
+function escapePowerShellSingleQuoted(value: string): string {
+  return value.replaceAll("'", "''");
 }
 
 async function executableExists(
