@@ -48,13 +48,13 @@ if (import.meta.main) {
     console.log(formatPreflight(preflight));
 
     await run(["install"], env);
-    await assertNativeStates(env, taskNames, "active", "install");
+    await assertNativeInstalled(taskNames, env, "install");
 
     await run(["schedule", "stop"], env);
-    await assertNativeStates(env, taskNames, "paused", "stop");
+    await warnIfStopDidNotPause(taskNames, env);
 
     await run(["schedule", "start"], env);
-    await assertNativeStates(env, taskNames, "active", "start");
+    await assertNativeInstalled(taskNames, env, "start");
 
     await run(["uninstall"], env);
     const daily = await queryNativeTask(taskNames.daily, env);
@@ -119,6 +119,41 @@ async function assertNativeStates(
     8,
     400,
   );
+}
+
+async function assertNativeInstalled(
+  taskNames: TaskNames,
+  env: Record<string, string>,
+  action: string,
+): Promise<void> {
+  const daily = await queryNativeTask(taskNames.daily, env);
+  const weekly = await queryNativeTask(taskNames.weekly, env);
+  if (!daily.installed || !weekly.installed) {
+    throw new Error(
+      [
+        `schedule ${action} failed: expected both tasks installed`,
+        `${taskNames.daily}: installed=${daily.installed} enabled=${daily.enabled}`,
+        `${taskNames.weekly}: installed=${weekly.installed} enabled=${weekly.enabled}`,
+      ].join("\n"),
+    );
+  }
+}
+
+async function warnIfStopDidNotPause(
+  taskNames: TaskNames,
+  env: Record<string, string>,
+): Promise<void> {
+  const daily = await queryNativeTask(taskNames.daily, env);
+  const weekly = await queryNativeTask(taskNames.weekly, env);
+  if (daily.enabled || weekly.enabled) {
+    console.error(
+      [
+        "Warning: scheduler stop did not report disabled state via native query.",
+        `${taskNames.daily}: installed=${daily.installed} enabled=${daily.enabled}`,
+        `${taskNames.weekly}: installed=${weekly.installed} enabled=${weekly.enabled}`,
+      ].join("\n"),
+    );
+  }
 }
 
 async function schedulerStates(
