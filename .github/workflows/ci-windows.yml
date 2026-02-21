@@ -1,0 +1,41 @@
+name: CI Windows
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.6.9
+
+      - name: Install SQLite
+        shell: pwsh
+        run: choco install sqlite --no-progress -y
+
+      - name: Validate
+        shell: pwsh
+        run: |
+          deno task lint
+          deno task typecheck
+          deno task test:unit
+          deno task test:integration
+          deno task test:acceptance:platform:windows
+
+      - name: Windows native scheduler smoke
+        shell: pwsh
+        run: |
+          $env:ZEN_BACKUP_LIVE_SMOKE = "1"
+          deno task test:smoke:windows:scheduler
