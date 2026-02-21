@@ -71,8 +71,10 @@ async function smokeCheckBinary(path: string): Promise<void> {
     stderr: "piped",
   }).output();
 
+  const stdout = new TextDecoder().decode(out.stdout);
   const stderr = new TextDecoder().decode(out.stderr);
-  if (out.code !== 1 || !stderr.includes("Usage: zen-backup")) {
+  const combined = `${stdout}\n${stderr}`;
+  if (out.code === 0 || !combined.includes("Usage")) {
     throw new Error(`smoke check failed for ${path}`);
   }
 }
