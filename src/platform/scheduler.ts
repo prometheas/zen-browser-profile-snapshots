@@ -39,6 +39,12 @@ export async function startScheduler(options: RuntimeOptions = {}): Promise<Sche
   const hasPlists = await exists(dailyPlist) && await exists(weeklyPlist);
   if (!hasPlists) return await queryLaunchd(options);
 
+  if (await shouldUseRealLaunchctl(options)) {
+    const domain = await launchctlDomain(options);
+    await launchctl(["enable", `${domain}/${DAILY_LABEL}`], options);
+    await launchctl(["enable", `${domain}/${WEEKLY_LABEL}`], options);
+  }
+
   await Deno.remove(join(agentsDir, `.disabled-${DAILY_LABEL}`)).catch(() => undefined);
   await Deno.remove(join(agentsDir, `.disabled-${WEEKLY_LABEL}`)).catch(() => undefined);
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
@@ -54,6 +60,12 @@ export async function stopScheduler(options: RuntimeOptions = {}): Promise<Sched
   const weeklyPlist = join(agentsDir, `${WEEKLY_LABEL}.plist`);
   const hasPlists = await exists(dailyPlist) && await exists(weeklyPlist);
   if (!hasPlists) return await queryLaunchd(options);
+
+  if (await shouldUseRealLaunchctl(options)) {
+    const domain = await launchctlDomain(options);
+    await launchctl(["disable", `${domain}/${DAILY_LABEL}`], options);
+    await launchctl(["disable", `${domain}/${WEEKLY_LABEL}`], options);
+  }
 
   await Deno.writeTextFile(join(agentsDir, `.disabled-${DAILY_LABEL}`), "1");
   await Deno.writeTextFile(join(agentsDir, `.disabled-${WEEKLY_LABEL}`), "1");
@@ -96,26 +108,40 @@ async function installLaunchd(config: AppConfig, options: RuntimeOptions): Promi
       weekday: weekdayNumber(config.schedule.weekly_day),
     }),
   );
+
+  if (await shouldUseRealLaunchctl(options)) {
+    const domain = await launchctlDomain(options);
+    await launchctl(["bootout", domain, dailyPath], options).catch(() => undefined);
+    await launchctl(["bootout", domain, weeklyPath], options).catch(() => undefined);
+    await launchctl(["bootstrap", domain, dailyPath], options);
+    await launchctl(["bootstrap", domain, weeklyPath], options);
+    await launchctl(["enable", `${domain}/${DAILY_LABEL}`], options);
+    await launchctl(["enable", `${domain}/${WEEKLY_LABEL}`], options);
+  }
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
   await Deno.remove(join(agentsDir, `.disabled-${DAILY_LABEL}`)).catch(() => undefined);
   await Deno.remove(join(agentsDir, `.disabled-${WEEKLY_LABEL}`)).catch(() => undefined);
-  return {
-    installed: true,
-    labels: [DAILY_LABEL, WEEKLY_LABEL],
-    states: {
-      [DAILY_LABEL]: "active",
-      [WEEKLY_LABEL]: "active",
-    },
-  };
+
+  return await queryLaunchd(options);
 }
 
 async function uninstallLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
-  await Deno.remove(join(agentsDir, `${DAILY_LABEL}.plist`)).catch(() => undefined);
-  await Deno.remove(join(agentsDir, `${WEEKLY_LABEL}.plist`)).catch(() => undefined);
+  const dailyPath = join(agentsDir, `${DAILY_LABEL}.plist`);
+  const weeklyPath = join(agentsDir, `${WEEKLY_LABEL}.plist`);
+
+  if (await shouldUseRealLaunchctl(options)) {
+    const domain = await launchctlDomain(options);
+    await launchctl(["bootout", domain, dailyPath], options).catch(() => undefined);
+    await launchctl(["bootout", domain, weeklyPath], options).catch(() => undefined);
+  }
+
   await Deno.remove(join(agentsDir, ".zen-backup-loaded")).catch(() => undefined);
   await Deno.remove(join(agentsDir, `.disabled-${DAILY_LABEL}`)).catch(() => undefined);
   await Deno.remove(join(agentsDir, `.disabled-${WEEKLY_LABEL}`)).catch(() => undefined);
+  await Deno.remove(dailyPath).catch(() => undefined);
+  await Deno.remove(weeklyPath).catch(() => undefined);
+
   return {
     installed: false,
     labels: [],
@@ -130,19 +156,32 @@ async function queryLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
   const daily = join(agentsDir, `${DAILY_LABEL}.plist`);
   const weekly = join(agentsDir, `${WEEKLY_LABEL}.plist`);
-  const loadedMarker = join(agentsDir, ".zen-backup-loaded");
   const dailyInstalled = await exists(daily);
   const weeklyInstalled = await exists(weekly);
-  const loaded = await exists(loadedMarker);
-  const dailyPaused = await exists(join(agentsDir, `.disabled-${DAILY_LABEL}`));
-  const weeklyPaused = await exists(join(agentsDir, `.disabled-${WEEKLY_LABEL}`));
-  const installed = dailyInstalled && weeklyInstalled && loaded;
+  let dailyPaused = false;
+  let weeklyPaused = false;
+
+  if (await shouldUseRealLaunchctl(options)) {
+    const domain = await launchctlDomain(options);
+    dailyPaused = await exists(join(agentsDir, `.disabled-${DAILY_LABEL}`));
+    weeklyPaused = await exists(join(agentsDir, `.disabled-${WEEKLY_LABEL}`));
+    const disabled = await launchctlOptional(["print-disabled", domain], options);
+    if (disabled) {
+      dailyPaused = labelDisabled(disabled, DAILY_LABEL);
+      weeklyPaused = labelDisabled(disabled, WEEKLY_LABEL);
+    }
+    if (dailyInstalled) await launchctlOptional(["print", `${domain}/${DAILY_LABEL}`], options);
+    if (weeklyInstalled) await launchctlOptional(["print", `${domain}/${WEEKLY_LABEL}`], options);
+  } else {
+    dailyPaused = await exists(join(agentsDir, `.disabled-${DAILY_LABEL}`));
+    weeklyPaused = await exists(join(agentsDir, `.disabled-${WEEKLY_LABEL}`));
+  }
 
   const states: Record<string, "active" | "paused" | "not_installed"> = {};
   states[DAILY_LABEL] = !dailyInstalled ? "not_installed" : dailyPaused ? "paused" : "active";
   states[WEEKLY_LABEL] = !weeklyInstalled ? "not_installed" : weeklyPaused ? "paused" : "active";
   return {
-    installed,
+    installed: dailyInstalled && weeklyInstalled,
     labels: dailyInstalled || weeklyInstalled ? [DAILY_LABEL, WEEKLY_LABEL] : [],
     states,
   };
@@ -150,6 +189,90 @@ async function queryLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
 
 function resolveHome(options: RuntimeOptions): string {
   return options.env?.HOME ?? options.env?.USERPROFILE ?? Deno.cwd();
+}
+
+async function shouldUseRealLaunchctl(options: RuntimeOptions): Promise<boolean> {
+  if (options.env?.ZEN_BACKUP_FORCE_SIMULATED_LAUNCHCTL === "1") {
+    return false;
+  }
+  const os = options.os ?? (Deno.build.os as Platform);
+  if (os !== "darwin") return false;
+  const runtimeHome = resolveHome(options);
+  const processHome = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE");
+  if (processHome && runtimeHome !== processHome) return false;
+  return await commandExists("launchctl", options);
+}
+
+async function launchctlDomain(options: RuntimeOptions): Promise<string> {
+  const out = await commandOptional("id", ["-u"], options);
+  const uid = out?.trim().length ? out.trim() : "501";
+  return `gui/${uid}`;
+}
+
+async function launchctl(args: string[], options: RuntimeOptions): Promise<string> {
+  const out = await new Deno.Command("launchctl", {
+    args,
+    env: commandEnv(options),
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  if (!out.success) {
+    const stderr = new TextDecoder().decode(out.stderr).trim();
+    throw new Error(`launchctl ${args.join(" ")} failed: ${stderr}`);
+  }
+  return new TextDecoder().decode(out.stdout);
+}
+
+async function launchctlOptional(args: string[], options: RuntimeOptions): Promise<string | null> {
+  const out = await new Deno.Command("launchctl", {
+    args,
+    env: commandEnv(options),
+    stdout: "piped",
+    stderr: "null",
+  }).output();
+  if (!out.success) return null;
+  return new TextDecoder().decode(out.stdout);
+}
+
+function labelDisabled(printDisabledOutput: string, label: string): boolean {
+  const lines = printDisabledOutput.split("\n").map((line) => line.trim());
+  for (const line of lines) {
+    if (!line.includes(label)) continue;
+    if (line.includes("=> true") || line.includes("= true")) return true;
+    if (line.includes("=> false") || line.includes("= false")) return false;
+  }
+  return false;
+}
+
+async function commandExists(binary: string, options: RuntimeOptions): Promise<boolean> {
+  const out = await new Deno.Command("sh", {
+    args: ["-lc", `command -v ${binary}`],
+    env: commandEnv(options),
+    stdout: "null",
+    stderr: "null",
+  }).output();
+  return out.success;
+}
+
+async function commandOptional(
+  binary: string,
+  args: string[],
+  options: RuntimeOptions,
+): Promise<string | null> {
+  const out = await new Deno.Command(binary, {
+    args,
+    env: commandEnv(options),
+    stdout: "piped",
+    stderr: "null",
+  }).output();
+  if (!out.success) return null;
+  return new TextDecoder().decode(out.stdout);
+}
+
+function commandEnv(options: RuntimeOptions): Record<string, string> | undefined {
+  const env = options.env;
+  if (!env) return undefined;
+  return Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<string, string>;
 }
 
 function hourFromTime(time: string): number {
