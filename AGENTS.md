@@ -47,3 +47,9 @@ Story/spec boundary:
 ## Commit Guidance
 - Use conventional commits (e.g., `docs: ...`, `feat: ...`, `fix: ...`).
 - Keep commits small and scoped to a single logical change.
+
+## Repository Naming Rules
+- Use `lower-kebab-case` for all new file names and directory names.
+- Do not use underscores or mixed/upper case in file/directory names.
+- Explicit filename exceptions: `AGENTS.md` and `README.md`.
+- If renaming paths for this rule, update all imports and file references in the same change.
