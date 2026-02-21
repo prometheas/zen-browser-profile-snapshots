@@ -102,6 +102,7 @@ Feature: Notifications
   @linux
   Scenario: Backup continues when notify-send is not available
     Given notify-send is not installed
+    And a Zen browser process is running
     When a daily backup is created
     Then the backup completes successfully
     And a warning is logged about notifications unavailable
