@@ -90,8 +90,7 @@ install -m 0755 ./zen-backup-<target> /usr/local/bin/zen-backup
 
 ### Build from source (requires Deno 2)
 
-- `deno task build:macos`
-- `deno task build:linux`
+For developer build and test workflows, see `docs/development/OVERVIEW.md`.
 
 ## First-Time Setup
 
@@ -120,16 +119,6 @@ Notes:
 - The smoke task is intentionally guarded and exits unless `ZEN_BACKUP_LIVE_SMOKE=1` is set.
 - If current scheduler jobs are paused before the test, they are left paused.
 
-## Acceptance Test Shortcuts
-
-Use task aliases instead of long Cucumber commands:
-
-- `deno task test:acceptance`
-- `deno task test:acceptance:platform`
-- `deno task test:acceptance:platform:macos`
-- `deno task test:acceptance:platform:linux`
-- `deno task test:acceptance:platform:windows`
-
 ## Feedback and Issues
 
 Report bugs and beta feedback in GitHub Issues:
@@ -144,17 +133,11 @@ Please include:
 - stdout/stderr output
 - relevant files from `~/zen-backups/backup.log` (if available)
 
-## Packaging (Maintainers)
+## Development
 
-- Combined tagged release (macOS + Linux artifacts, unified release notes from conventional
-  commits):
-  - push a `v*` tag (handled by `.github/workflows/release-combined.yml`)
-- Build macOS release artifacts (binaries + checksums + release notes):
-  - `deno task release:macos`
-  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:macos`
-- Build Linux release artifacts (binaries + checksums + release notes):
-  - `deno task release:linux`
-  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:linux`
+Development setup, task conventions, testing strategy, and release workflows are documented in:
+
+- `docs/development/OVERVIEW.md`
 
 ## Docs
 
@@ -166,9 +149,3 @@ The specs are the source of truth:
 - `docs/features/`
 - `docs/releases/macos-beta-checklist.md`
 - `docs/releases/linux-beta-checklist.md`
-
-## Contributing
-
-- Follow the Constitution in `docs/product/constitution.md`
-- Use conventional commits
-- Keep changes scoped and testable

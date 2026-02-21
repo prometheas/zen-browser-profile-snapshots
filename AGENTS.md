@@ -42,6 +42,8 @@ Use these docs as the primary requirements:
 - `docs/product/constitution.md`
 - `docs/product/user-stories.md`
 - `docs/features/`
+- `docs/development/OVERVIEW.md` (developer workflow index)
+- `docs/development/TESTING.md` (test creation and execution guidance)
 
 When implementation decisions change behavior, update the relevant docs in the same change set:
 
@@ -64,6 +66,8 @@ Story/spec boundary:
 - Keep behavior consistent across platforms, with platform-specific integrations isolated to
   adapters.
 - Prefer explicit precondition checks and clear error messages.
+- When adding/changing tests, follow `docs/development/TESTING.md` for layer selection
+  (unit/integration/acceptance), TDD expectations, and required run commands.
 
 ## Commit Guidance
 
