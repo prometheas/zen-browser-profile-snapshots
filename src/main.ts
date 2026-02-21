@@ -1,3 +1,4 @@
+import { isHelpFlag, renderHelp } from "./cli/help.ts";
 import { runBackup } from "./commands/backup.ts";
 import { runInstall } from "./commands/install.ts";
 import { runList } from "./commands/list.ts";
@@ -14,58 +15,90 @@ export interface CliResult {
 }
 
 export async function runCli(args: string[], options: RuntimeOptions = {}): Promise<CliResult> {
+  const env = options.env ?? Deno.env.toObject();
+  const color = env.NO_COLOR !== "1" && !Deno.noColor;
+
   if (args.length === 0) {
     return {
       exitCode: 1,
       stdout: "",
-      stderr: usageText(),
+      stderr: renderHelp("root", { color }),
+    };
+  }
+
+  if (isHelpFlag(args[0]) || args[0] === "help") {
+    return {
+      exitCode: 0,
+      stdout: renderHelp("root", { color }),
+      stderr: "",
     };
   }
 
   let result: { exitCode: number; stdout: string[]; stderr: string[] };
 
   if (args[0] === "status") {
+    if (isHelpFlag(args[1])) {
+      return { exitCode: 0, stdout: renderHelp("status", { color }), stderr: "" };
+    }
     result = await runStatus(options);
   } else if (args[0] === "list") {
+    if (isHelpFlag(args[1])) {
+      return { exitCode: 0, stdout: renderHelp("list", { color }), stderr: "" };
+    }
     result = await runList(options);
   } else if (args[0] === "backup") {
+    if (isHelpFlag(args[1])) {
+      return { exitCode: 0, stdout: renderHelp("backup", { color }), stderr: "" };
+    }
     const kind = args[1];
     if (kind !== "daily" && kind !== "weekly") {
       return {
         exitCode: 1,
         stdout: "",
-        stderr: `${usageText()}\n\nUsage: zen-backup backup <daily|weekly>`,
+        stderr: `${renderHelp("root", { color })}\n\n${renderHelp("backup", { color })}`,
       };
     }
     result = await runBackup(kind, options);
   } else if (args[0] === "restore") {
+    if (isHelpFlag(args[1])) {
+      return { exitCode: 0, stdout: renderHelp("restore", { color }), stderr: "" };
+    }
     const archive = args[1];
     if (!archive) {
       return {
         exitCode: 1,
         stdout: "",
-        stderr: `${usageText()}\n\nUsage: zen-backup restore <archive>`,
+        stderr: `${renderHelp("root", { color })}\n\n${renderHelp("restore", { color })}`,
       };
     }
     result = await runRestore(archive, options);
   } else if (args[0] === "install") {
+    if (isHelpFlag(args[1])) {
+      return { exitCode: 0, stdout: renderHelp("install", { color }), stderr: "" };
+    }
     result = await runInstall(options);
   } else if (args[0] === "uninstall") {
+    if (isHelpFlag(args[1])) {
+      return { exitCode: 0, stdout: renderHelp("uninstall", { color }), stderr: "" };
+    }
     const purge = args.includes("--purge-backups");
     result = await runUninstall({
       ...options,
       env: {
-        ...(options.env ?? Deno.env.toObject()),
+        ...env,
         ZEN_BACKUP_PURGE_BACKUPS: purge ? "1" : "0",
       },
     });
   } else if (args[0] === "schedule") {
+    if (isHelpFlag(args[1])) {
+      return { exitCode: 0, stdout: renderHelp("schedule", { color }), stderr: "" };
+    }
     const action = args[1] as "start" | "resume" | "stop" | "pause" | "status" | undefined;
     if (!action || !["start", "resume", "stop", "pause", "status"].includes(action)) {
       return {
         exitCode: 1,
         stdout: "",
-        stderr: `${usageText()}\n\nUsage: zen-backup schedule <start|stop|pause|resume|status>`,
+        stderr: `${renderHelp("root", { color })}\n\n${renderHelp("schedule", { color })}`,
       };
     }
     result = await runSchedule(action, options);
@@ -73,7 +106,11 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
     result = {
       exitCode: 1,
       stdout: [],
-      stderr: [`Command not implemented yet: ${args[0]}`],
+      stderr: [
+        `Unknown command: ${args[0]}`,
+        "",
+        renderHelp("root", { color }),
+      ],
     };
   }
 
@@ -82,19 +119,6 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
     stdout: result.stdout.join("\n"),
     stderr: result.stderr.join("\n"),
   };
-}
-
-function usageText(): string {
-  return [
-    "Usage: zen-backup <backup|restore|list|status|install|uninstall|schedule> ...",
-    "  zen-backup backup <daily|weekly>",
-    "  zen-backup restore <archive>",
-    "  zen-backup list",
-    "  zen-backup status",
-    "  zen-backup install",
-    "  zen-backup uninstall [--purge-backups]",
-    "  zen-backup schedule <start|stop|pause|resume|status>",
-  ].join("\n");
 }
 
 if (import.meta.main) {
