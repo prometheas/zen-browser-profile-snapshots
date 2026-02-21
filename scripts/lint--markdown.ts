@@ -14,6 +14,7 @@ const command = new Deno.Command("deno", {
     "#skills",
     "#.github/skills",
     "#.direnv",
+    "#dist",
     "#docs/plans",
   ],
   stdout: "inherit",

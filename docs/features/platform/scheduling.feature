@@ -166,3 +166,33 @@ Feature: Scheduling
     When "zen-backup schedule status" is run
     Then stdout lists "com.prometheas.zen-backup.daily"
     And stdout lists "com.prometheas.zen-backup.weekly"
+
+  @linux
+  Scenario: Schedule stop disables systemd timers without uninstalling
+    Given the backup tool is installed
+    When "zen-backup schedule stop" is run
+    Then stdout lists "zen-backup-daily.timer: paused"
+    And stdout lists "zen-backup-weekly.timer: paused"
+
+  @linux
+  Scenario: Schedule start enables paused systemd timers
+    Given the backup tool is installed
+    And "zen-backup schedule stop" was run
+    When "zen-backup schedule start" is run
+    Then stdout lists "zen-backup-daily.timer: active"
+    And stdout lists "zen-backup-weekly.timer: active"
+
+  @linux
+  Scenario: Schedule aliases map to primary commands on Linux
+    Given the backup tool is installed
+    When "zen-backup schedule pause" is run
+    Then stdout lists "paused"
+    When "zen-backup schedule resume" is run
+    Then stdout lists "active"
+
+  @linux
+  Scenario: Schedule status reports daily and weekly timer states
+    Given the backup tool is installed
+    When "zen-backup schedule status" is run
+    Then stdout lists "zen-backup-daily.timer"
+    And stdout lists "zen-backup-weekly.timer"
