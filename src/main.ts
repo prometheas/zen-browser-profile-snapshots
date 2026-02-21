@@ -146,12 +146,20 @@ if (import.meta.main) {
 
 function formatVersionOutput(version: string, color: boolean): string {
   const parsed = parseVersionForDisplay(version);
-  const parts = [`zen-backup ${parsed.semver}`];
-  if (parsed.suffix) {
-    parts.push(color ? `\u001b[1m${parsed.suffix}\u001b[0m` : parsed.suffix);
+  if (parsed.kind === "production") {
+    return `zen-backup ${parsed.semver}`;
   }
-  if (parsed.hash) {
-    parts.push(color ? `\u001b[90m#${parsed.hash}\u001b[0m` : `#${parsed.hash}`);
+
+  if (parsed.kind === "preview" && parsed.channel && parsed.channelIteration) {
+    if (!color) return `zen-backup ${parsed.raw}`;
+    const channelColor = parsed.channel === "alpha" ? "31" : "33";
+    let out =
+      `zen-backup ${parsed.semver}-\u001b[1;${channelColor}m${parsed.channel}\u001b[0m.${parsed.channelIteration}`;
+    if (parsed.aheadCount && parsed.hash) {
+      out += `-${parsed.aheadCount}-\u001b[90mg${parsed.hash}\u001b[0m`;
+    }
+    return out;
   }
-  return parts.join(" ");
+
+  return `zen-backup ${version}`;
 }

@@ -16,32 +16,45 @@ export async function resolveVersion(): Promise<string> {
 }
 
 export interface VersionDisplayParts {
+  kind: "production" | "preview" | "other";
   semver: string;
-  suffix?: string;
+  channel?: "alpha" | "beta";
+  channelIteration?: string;
+  aheadCount?: string;
   hash?: string;
+  raw: string;
 }
 
 export function parseVersionForDisplay(version: string): VersionDisplayParts {
   const cleaned = version.trim();
-  const describeMatch = cleaned.match(
-    /^v?(\d+\.\d+\.\d+)(?:-([0-9A-Za-z.-]+))?-\d+-g([0-9a-fA-F]+)(?:-dirty)?$/,
-  );
-  if (describeMatch) {
-    const [, semver, suffix, hash] = describeMatch;
+  const productionMatch = cleaned.match(/^v?(\d+\.\d+\.\d+)$/);
+  if (productionMatch) {
+    const [, semver] = productionMatch;
     return {
+      kind: "production",
       semver,
-      suffix: suffix || undefined,
-      hash: hash || undefined,
+      raw: semver,
     };
   }
 
-  const taggedMatch = cleaned.match(/^v?(\d+\.\d+\.\d+)(?:-([0-9A-Za-z.-]+))?$/);
-  if (taggedMatch) {
-    const [, semver, suffix] = taggedMatch;
+  const previewMatch = cleaned.match(
+    /^v?(\d+\.\d+\.\d+)-(alpha|beta)\.(\d+)(?:-(\d+)-g?([0-9a-fA-F]+))?(?:-dirty)?$/,
+  );
+  if (previewMatch) {
+    const [, semver, channel, channelIteration, aheadCount, hash] = previewMatch;
+    const raw = `${semver}-${channel}.${channelIteration}${
+      aheadCount && hash ? `-${aheadCount}-g${hash}` : ""
+    }`;
     return {
+      kind: "preview",
       semver,
-      suffix: suffix || undefined,
+      channel: channel as "alpha" | "beta",
+      channelIteration,
+      aheadCount: aheadCount || undefined,
+      hash: hash || undefined,
+      raw,
     };
   }
-  return { semver: cleaned };
+
+  return { kind: "other", semver: cleaned, raw: cleaned };
 }
