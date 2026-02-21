@@ -147,19 +147,19 @@ if (import.meta.main) {
 function formatVersionOutput(version: string, color: boolean): string {
   const parsed = parseVersionForDisplay(version);
   if (parsed.kind === "production") {
-    return `zen-backup ${parsed.semver}`;
+    return parsed.semver;
   }
 
   if (parsed.kind === "preview" && parsed.channel && parsed.channelIteration) {
-    if (!color) return `zen-backup ${parsed.raw}`;
+    if (!color) return parsed.raw;
     const channelColor = parsed.channel === "alpha" ? "31" : "33";
     let out =
-      `zen-backup ${parsed.semver}-\u001b[1;${channelColor}m${parsed.channel}\u001b[0m.${parsed.channelIteration}`;
+      `${parsed.semver}-\u001b[1;${channelColor}m${parsed.channel}\u001b[0m.${parsed.channelIteration}`;
     if (parsed.aheadCount && parsed.hash) {
       out += `-${parsed.aheadCount}-\u001b[90mg${parsed.hash}\u001b[0m`;
     }
     return out;
   }
 
-  return `zen-backup ${version}`;
+  return version;
 }

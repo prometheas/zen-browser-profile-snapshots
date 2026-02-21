@@ -31,7 +31,7 @@ Deno.test("global -v renders version and exits zero", async () => {
   });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
-  assertEquals(result.stdout, "zen-backup 9.9.9");
+  assertEquals(result.stdout, "9.9.9");
 });
 
 Deno.test("global --version renders version and exits zero", async () => {
@@ -40,7 +40,7 @@ Deno.test("global --version renders version and exits zero", async () => {
   });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
-  assertEquals(result.stdout, "zen-backup 9.9.8");
+  assertEquals(result.stdout, "9.9.8");
 });
 
 Deno.test("global --version keeps production output uncolored", async () => {
@@ -49,7 +49,7 @@ Deno.test("global --version keeps production output uncolored", async () => {
   });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
-  assertEquals(result.stdout, "zen-backup 1.2.3");
+  assertEquals(result.stdout, "1.2.3");
 });
 
 Deno.test("global --version styles preview channel and hash", async () => {
@@ -58,7 +58,7 @@ Deno.test("global --version styles preview channel and hash", async () => {
   });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
-  assertStringIncludes(result.stdout, "zen-backup 1.2.3-");
+  assertStringIncludes(result.stdout, "1.2.3-");
   assertStringIncludes(result.stdout, "\u001b[1;33mbeta\u001b[0m.1");
   assertStringIncludes(result.stdout, "-5-\u001b[90mgabc1234\u001b[0m");
 });
@@ -76,5 +76,5 @@ Deno.test("global --version preview stays plain when color disabled", async () =
     env: { ZEN_BACKUP_VERSION: "v1.2.3-beta.1-7-gec48680", NO_COLOR: "1" },
   });
   assertEquals(result.exitCode, 0);
-  assertEquals(result.stdout, "zen-backup 1.2.3-beta.1-7-gec48680");
+  assertEquals(result.stdout, "1.2.3-beta.1-7-gec48680");
 });
