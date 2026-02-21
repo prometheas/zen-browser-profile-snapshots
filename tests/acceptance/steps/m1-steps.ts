@@ -5,10 +5,15 @@ import { loadConfig } from "../../../src/config.ts";
 import { expandPath } from "../../../src/core/path-utils.ts";
 import { runCli } from "../../../src/main.ts";
 import type { Platform } from "../../../src/types.ts";
+import { platformEnvFromTags } from "../support/platform-env.ts";
 import { ZenWorld } from "../support/world.ts";
 
-Before(async function (this: ZenWorld) {
+Before(async function (
+  this: ZenWorld,
+  hook: { pickle: { tags: ReadonlyArray<{ name: string }> } },
+) {
   await this.initWorkspace();
+  Object.assign(this.env, platformEnvFromTags(hook.pickle.tags.map((tag) => tag.name)));
 });
 
 Given("no settings.toml file exists", function (this: ZenWorld) {

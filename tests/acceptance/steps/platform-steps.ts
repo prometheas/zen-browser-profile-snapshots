@@ -1,23 +1,9 @@
-import { Before, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
+import { Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../../src/main.ts";
 import type { Platform } from "../../../src/types.ts";
 import { ZenWorld } from "../support/world.ts";
-
-Before({ tags: "@linux" }, function (this: ZenWorld) {
-  this.env.ZEN_BACKUP_TEST_OS = "linux";
-});
-
-Before({ tags: "@windows" }, function (this: ZenWorld) {
-  this.env.ZEN_BACKUP_TEST_OS = "windows";
-  this.env.ZEN_BACKUP_FORCE_SIMULATED_WINDOWS_SCHEDULER = "1";
-  this.env.ZEN_BACKUP_FORCE_SIMULATED_WINDOWS_TOAST = "1";
-});
-
-Before({ tags: "@macos" }, function (this: ZenWorld) {
-  this.env.ZEN_BACKUP_TEST_OS = "darwin";
-});
 
 Given("a Zen profile exists at {string}", async function (this: ZenWorld, path: string) {
   const resolved = expandKnownPath(this, path);
