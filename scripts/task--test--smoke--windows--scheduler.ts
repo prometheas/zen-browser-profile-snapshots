@@ -82,8 +82,14 @@ async function assertStates(
   expected: string,
   action: string,
 ): Promise<void> {
-  const snapshot = await schedulerStates(env, taskNames);
-  validateSchedulerStates(snapshot.states, taskNames, expected, action, snapshot.raw);
+  await waitForExpectedStates(
+    () => schedulerStates(env, taskNames),
+    taskNames,
+    expected,
+    action,
+    8,
+    400,
+  );
 }
 
 async function schedulerStates(
@@ -140,6 +146,30 @@ export function validateSchedulerStates(
       );
     }
   }
+}
+
+export async function waitForExpectedStates(
+  readStates: () => Promise<SchedulerSnapshot>,
+  taskNames: TaskNames,
+  expected: string,
+  action: string,
+  attempts: number,
+  delayMs: number,
+): Promise<void> {
+  let lastError: Error | undefined;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const snapshot = await readStates();
+    try {
+      validateSchedulerStates(snapshot.states, taskNames, expected, action, snapshot.raw);
+      return;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  throw lastError ?? new Error(`schedule ${action} failed`);
 }
 
 async function run(args: string[], env: Record<string, string>): Promise<string> {
