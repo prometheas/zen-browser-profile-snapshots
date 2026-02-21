@@ -1,0 +1,44 @@
+name: CI Linux
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.6.9
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+
+      - name: Validate
+        run: |
+          deno task lint
+          deno task typecheck
+          deno task test:unit
+          deno task test:integration
+
+      - name: Linux acceptance (platform)
+        run: |
+          deno run -A npm:@cucumber/cucumber@12.6.0 \
+            --import tests/acceptance/support/world.ts \
+            --import tests/acceptance/steps/index.ts \
+            --tags '@linux' \
+            docs/features/platform/install.feature \
+            docs/features/platform/scheduling.feature \
+            docs/features/platform/notifications.feature
