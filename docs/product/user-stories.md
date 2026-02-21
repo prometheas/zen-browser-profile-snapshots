@@ -4,9 +4,8 @@
 
 ### US-01 Automatic Daily Backups
 
-**As a** Zen browser user
-**I want** daily backups to run automatically on a schedule
-**So that** I don't have to remember to back up my profile manually
+**As a** Zen browser user **I want** daily backups to run automatically on a schedule **So that** I
+don't have to remember to back up my profile manually
 
 **Acceptance criteria:**
 
@@ -19,9 +18,8 @@
 
 ### US-02 Automatic Weekly Backups
 
-**As a** Zen browser user
-**I want** weekly backups to run automatically every Sunday
-**So that** I have long-term snapshots I can roll back to weeks later
+**As a** Zen browser user **I want** weekly backups to run automatically every Sunday **So that** I
+have long-term snapshots I can roll back to weeks later
 
 **Acceptance criteria:**
 
@@ -36,9 +34,8 @@
 
 ### US-03 Manual Daily Backup
 
-**As a** Zen browser user
-**I want** to trigger a daily backup on demand
-**So that** I can take a snapshot before a risky operation
+**As a** Zen browser user **I want** to trigger a daily backup on demand **So that** I can take a
+snapshot before a risky operation
 
 **Acceptance criteria:**
 
@@ -50,9 +47,8 @@
 
 ### US-04 Manual Weekly Backup
 
-**As a** Zen browser user
-**I want** to trigger a weekly backup on demand
-**So that** I can take a long-term snapshot at any time
+**As a** Zen browser user **I want** to trigger a weekly backup on demand **So that** I can take a
+long-term snapshot at any time
 
 **Acceptance criteria:**
 
@@ -66,9 +62,8 @@
 
 ### US-05 Safe SQLite Backup
 
-**As a** Zen browser user
-**I want** SQLite databases to be backed up using SQLite backup API
-**So that** I never get corrupted or partially-written database copies
+**As a** Zen browser user **I want** SQLite databases to be backed up using SQLite backup API **So
+that** I never get corrupted or partially-written database copies
 
 **Acceptance criteria:**
 
@@ -80,13 +75,13 @@
 
 ### US-06 SQLite Backup Fallback When Browser Is Running
 
-**As a** Zen browser user
-**I want** SQLite backups to fall back gracefully if a database is exclusively locked
-**So that** backups succeed even when Zen may still be open
+**As a** Zen browser user **I want** SQLite backups to fall back gracefully if a database is
+exclusively locked **So that** backups succeed even when Zen may still be open
 
 **Acceptance criteria:**
 
-- If SQLite backup fails due to an exclusive lock, the script falls back to copying the db + WAL/SHM files then checkpointing the copy
+- If SQLite backup fails due to an exclusive lock, the script falls back to copying the db + WAL/SHM
+  files then checkpointing the copy
 - The fallback produces a single clean database file without sidecar files
 
 ---
@@ -95,9 +90,8 @@
 
 ### US-07 Complete Profile Coverage
 
-**As a** Zen browser user
-**I want** all critical profile data backed up
-**So that** I can fully recover my browser experience after data loss
+**As a** Zen browser user **I want** all critical profile data backed up **So that** I can fully
+recover my browser experience after data loss
 
 **Acceptance criteria:**
 
@@ -105,14 +99,16 @@
   - History and bookmarks (`places.sqlite`)
   - Permissions (`permissions.sqlite`)
   - Form history (`formhistory.sqlite`)
-  - Extension configurations (`storage-sync-v2.sqlite`, extension sqlite in `moz-extension+++*` dirs)
+  - Extension configurations (`storage-sync-v2.sqlite`, extension sqlite in `moz-extension+++*`
+    dirs)
   - Favourites (`favicons.sqlite`)
   - Content preferences (`content-prefs.sqlite`)
   - Local storage archive (`storage/ls-archive.sqlite`)
   - Preferences (`prefs.js`, `user.js`)
   - Extension manifests and XPI files (`extensions/`, `extensions.json`)
   - Session state (`sessionstore-backups/`, `sessionstore.jsonlz4`)
-  - Zen-specific: workspaces, themes, shortcuts (`zen-workspaces.json`, `zen-themes.json`, `zen-keyboard-shortcuts.json`)
+  - Zen-specific: workspaces, themes, shortcuts (`zen-workspaces.json`, `zen-themes.json`,
+    `zen-keyboard-shortcuts.json`)
   - Extension store data (`extension-store/`, `browser-extension-data/`)
   - Permanent storage (`storage/permanent/`)
 
@@ -127,9 +123,8 @@
 
 ### US-08 Exclusion of Rebuild-able Data
 
-**As a** Zen browser user
-**I want** browser caches, crash dumps, telemetry, and transient data excluded from backups
-**So that** archives are small and fast to create
+**As a** Zen browser user **I want** browser caches, crash dumps, telemetry, and transient data
+excluded from backups **So that** archives are small and fast to create
 
 **Acceptance criteria:**
 
@@ -149,9 +144,8 @@
 
 ### US-09 Extension Runtime Data Coverage
 
-**As a** Zen browser user
-**I want** extension data stored inside `moz-extension+++*` directories to be backed up
-**So that** my extension configurations and runtime data are preserved
+**As a** Zen browser user **I want** extension data stored inside `moz-extension+++*` directories to
+be backed up **So that** my extension configurations and runtime data are preserved
 
 **Acceptance criteria:**
 
@@ -164,13 +158,13 @@
 
 ### US-10 Optional Cloud Sync
 
-**As a** Zen browser user
-**I want** backup archives to be optionally synced to a cloud storage folder
-**So that** my backups survive a local disk failure
+**As a** Zen browser user **I want** backup archives to be optionally synced to a cloud storage
+folder **So that** my backups survive a local disk failure
 
 **Acceptance criteria:**
 
-- When `cloud_path` points to a cloud-synced folder, each new archive is copied there after local creation
+- When `cloud_path` points to a cloud-synced folder, each new archive is copied there after local
+  creation
 - The cloud directory mirrors the `daily/` and `weekly/` structure
 - Supported providers: Google Drive, OneDrive, Dropbox, or any folder
 - iCloud Drive supported on macOS only
@@ -179,9 +173,8 @@
 
 ### US-11 Local-Only Mode
 
-**As a** Zen browser user
-**I want** to disable cloud sync and use local backups only
-**So that** I'm not required to use any cloud storage service
+**As a** Zen browser user **I want** to disable cloud sync and use local backups only **So that**
+I'm not required to use any cloud storage service
 
 **Acceptance criteria:**
 
@@ -194,13 +187,13 @@
 
 ### US-12 Automatic Daily Retention Enforcement
 
-**As a** Zen browser user
-**I want** daily backup archives older than the configured retention period to be automatically deleted
-**So that** old dailies don't accumulate and fill up my disk
+**As a** Zen browser user **I want** daily backup archives older than the configured retention
+period to be automatically deleted **So that** old dailies don't accumulate and fill up my disk
 
 **Acceptance criteria:**
 
-- After each backup run, archives in the daily directory older than `retention.daily_days` are deleted
+- After each backup run, archives in the daily directory older than `retention.daily_days` are
+  deleted
 - Archives within the retention window are preserved
 - The same pruning applies to the cloud daily directory if configured
 
@@ -208,13 +201,13 @@
 
 ### US-13 Automatic Weekly Retention Enforcement
 
-**As a** Zen browser user
-**I want** weekly backup archives older than the configured retention period to be automatically deleted
-**So that** weekly archives are kept within reasonable bounds
+**As a** Zen browser user **I want** weekly backup archives older than the configured retention
+period to be automatically deleted **So that** weekly archives are kept within reasonable bounds
 
 **Acceptance criteria:**
 
-- After each backup run, archives in the weekly directory older than `retention.weekly_days` are deleted
+- After each backup run, archives in the weekly directory older than `retention.weekly_days` are
+  deleted
 - Archives within the retention window are preserved
 - The same pruning applies to the cloud weekly directory if configured
 
@@ -222,13 +215,13 @@
 
 ### US-14 Configurable Retention Periods
 
-**As a** Zen browser user
-**I want** to set custom retention periods for daily and weekly archives
+**As a** Zen browser user **I want** to set custom retention periods for daily and weekly archives
 **So that** I can keep backups for longer or shorter depending on my storage constraints
 
 **Acceptance criteria:**
 
-- `retention.daily_days` and `retention.weekly_days` in `settings.toml` control how long each type is kept
+- `retention.daily_days` and `retention.weekly_days` in `settings.toml` control how long each type
+  is kept
 - Defaults are 30 days for daily and 84 days (12 weeks) for weekly
 - Missing config values fall back to defaults with no warning
 
@@ -238,9 +231,8 @@
 
 ### US-15 One-Command Restore
 
-**As a** Zen browser user
-**I want** to restore from any snapshot with a single command
-**So that** recovery from a broken profile is fast and simple
+**As a** Zen browser user **I want** to restore from any snapshot with a single command **So that**
+recovery from a broken profile is fast and simple
 
 **Acceptance criteria:**
 
@@ -252,22 +244,21 @@
 
 ### US-16 Safety Pre-Restore Backup
 
-**As a** Zen browser user
-**I want** my current profile to be saved before a restore overwrites it
+**As a** Zen browser user **I want** my current profile to be saved before a restore overwrites it
 **So that** I can undo the restore if needed
 
 **Acceptance criteria:**
 
-- Before extracting the archive, the current profile directory is renamed to `<profile>.pre-restore-YYYY-MM-DD`
+- Before extracting the archive, the current profile directory is renamed to
+  `<profile>.pre-restore-YYYY-MM-DD`
 - The pre-restore backup is left in place after restore completes
 
 ---
 
 ### US-17 Restore Blocked When Browser Is Running
 
-**As a** Zen browser user
-**I want** the restore command to refuse to run if Zen is open
-**So that** I don't corrupt my active browser session
+**As a** Zen browser user **I want** the restore command to refuse to run if Zen is open **So that**
+I don't corrupt my active browser session
 
 **Acceptance criteria:**
 
@@ -282,9 +273,8 @@
 
 ### US-18 List Available Snapshots
 
-**As a** Zen browser user
-**I want** to see all available backup snapshots with their type, date, and size
-**So that** I can identify and pick the right snapshot to restore from
+**As a** Zen browser user **I want** to see all available backup snapshots with their type, date,
+and size **So that** I can identify and pick the right snapshot to restore from
 
 **Acceptance criteria:**
 
@@ -296,9 +286,8 @@
 
 ### US-19 Backup Status Dashboard
 
-**As a** Zen browser user
-**I want** a status command that shows the last backup time, scheduled jobs, and disk usage
-**So that** I can confirm the backup system is healthy and working
+**As a** Zen browser user **I want** a status command that shows the last backup time, scheduled
+jobs, and disk usage **So that** I can confirm the backup system is healthy and working
 
 **Acceptance criteria:**
 
@@ -314,9 +303,8 @@
 
 ### US-20 Notification When Backing Up With Browser Open
 
-**As a** Zen browser user
-**I want** to be notified if a backup runs while Zen is open
-**So that** I'm aware the backup may include mid-write session files
+**As a** Zen browser user **I want** to be notified if a backup runs while Zen is open **So that**
+I'm aware the backup may include mid-write session files
 
 **Acceptance criteria:**
 
@@ -332,9 +320,8 @@
 
 ### US-21 Persistent Backup Logging
 
-**As a** Zen browser user
-**I want** all backup and restore events written to a log file
-**So that** I can audit history and diagnose failures
+**As a** Zen browser user **I want** all backup and restore events written to a log file **So that**
+I can audit history and diagnose failures
 
 **Acceptance criteria:**
 
@@ -350,8 +337,7 @@
 
 ### US-22 TOML-Based Configuration
 
-**As a** Zen browser user
-**I want** to configure all paths and retention settings via a TOML file
+**As a** Zen browser user **I want** to configure all paths and retention settings via a TOML file
 **So that** I can customise the tool without editing source code
 
 **Acceptance criteria:**
@@ -368,9 +354,8 @@
 
 ### US-23 Overridable Config Path
 
-**As a** Zen browser user
-**I want** to override the config file location via an environment variable
-**So that** I can use different configs in test or multi-environment contexts
+**As a** Zen browser user **I want** to override the config file location via an environment
+variable **So that** I can use different configs in test or multi-environment contexts
 
 **Acceptance criteria:**
 
@@ -383,9 +368,8 @@
 
 ### US-24 Auto-Detecting Interactive Installer
 
-**As a** Zen browser user
-**I want** an interactive installer to detect my Zen profile and guide me through setup
-**So that** configuration and scheduling are ready without manual file editing
+**As a** Zen browser user **I want** an interactive installer to detect my Zen profile and guide me
+through setup **So that** configuration and scheduling are ready without manual file editing
 
 **Acceptance criteria:**
 
@@ -394,7 +378,8 @@
   - Linux: `~/.zen/` or `~/.config/zen/`
   - Windows: `%APPDATA%\zen\Profiles\`
 - If none is found, the user is prompted to enter the path manually
-- The user is prompted for a local backup directory (default: `~/zen-backups` or `%USERPROFILE%\zen-backups`)
+- The user is prompted for a local backup directory (default: `~/zen-backups` or
+  `%USERPROFILE%\zen-backups`)
 - The user selects or skips cloud sync
 - A valid `settings.toml` is written on completion
 
@@ -402,9 +387,8 @@
 
 ### US-25 Cloud Sync Provider Selection During Install
 
-**As a** Zen browser user
-**I want** the installer to detect and offer my available cloud storage providers
-**So that** I can pick a provider without knowing the exact path
+**As a** Zen browser user **I want** the installer to detect and offer my available cloud storage
+providers **So that** I can pick a provider without knowing the exact path
 
 **Acceptance criteria:**
 
@@ -419,9 +403,8 @@
 
 ### US-26 Automated Scheduling on Install
 
-**As a** Zen browser user
-**I want** scheduled jobs installed automatically during setup
-**So that** backups are scheduled without manual scheduler commands
+**As a** Zen browser user **I want** scheduled jobs installed automatically during setup **So that**
+backups are scheduled without manual scheduler commands
 
 **Acceptance criteria:**
 
@@ -436,9 +419,8 @@
 
 ### US-27 Non-Destructive Uninstall
 
-**As a** Zen browser user
-**I want** to uninstall scheduled jobs and settings while keeping backups by default
-**So that** I can safely disable automation without accidentally deleting archives
+**As a** Zen browser user **I want** to uninstall scheduled jobs and settings while keeping backups
+by default **So that** I can safely disable automation without accidentally deleting archives
 
 **Acceptance criteria:**
 
@@ -452,9 +434,8 @@
 
 ### US-33 Scheduler Lifecycle Commands
 
-**As a** Zen browser user
-**I want** explicit schedule lifecycle commands
-**So that** I can start, stop, and inspect scheduling without reinstalling
+**As a** Zen browser user **I want** explicit schedule lifecycle commands **So that** I can start,
+stop, and inspect scheduling without reinstalling
 
 **Acceptance criteria:**
 
@@ -470,9 +451,8 @@
 
 ### US-28 Error: Profile Directory Missing
 
-**As a** Zen browser user
-**I want** a clear error when my profile directory doesn't exist
-**So that** I know to fix my configuration
+**As a** Zen browser user **I want** a clear error when my profile directory doesn't exist **So
+that** I know to fix my configuration
 
 **Acceptance criteria:**
 
@@ -484,9 +464,8 @@
 
 ### US-29 Error: Disk Full During Backup
 
-**As a** Zen browser user
-**I want** partial backup files cleaned up if disk becomes full
-**So that** I don't have corrupted archives taking up space
+**As a** Zen browser user **I want** partial backup files cleaned up if disk becomes full **So
+that** I don't have corrupted archives taking up space
 
 **Acceptance criteria:**
 
@@ -499,9 +478,8 @@
 
 ### US-30 Error: SQLite Corruption
 
-**As a** Zen browser user
-**I want** corrupted SQLite files to be skipped with a warning
-**So that** one corrupted file doesn't prevent the rest of my profile from being backed up
+**As a** Zen browser user **I want** corrupted SQLite files to be skipped with a warning **So that**
+one corrupted file doesn't prevent the rest of my profile from being backed up
 
 **Acceptance criteria:**
 
@@ -514,9 +492,8 @@
 
 ### US-31 Error: Cloud Sync Failure
 
-**As a** Zen browser user
-**I want** local backup to succeed even if cloud sync fails
-**So that** I always have at least a local copy
+**As a** Zen browser user **I want** local backup to succeed even if cloud sync fails **So that** I
+always have at least a local copy
 
 **Acceptance criteria:**
 
@@ -529,8 +506,7 @@
 
 ### US-32 Error: Corrupted Archive on Restore
 
-**As a** Zen browser user
-**I want** my original profile preserved if a restore archive is corrupted
+**As a** Zen browser user **I want** my original profile preserved if a restore archive is corrupted
 **So that** a bad restore doesn't leave me worse off
 
 **Acceptance criteria:**

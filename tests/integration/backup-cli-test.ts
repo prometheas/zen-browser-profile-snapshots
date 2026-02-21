@@ -1,9 +1,4 @@
-import {
-  assert,
-  assertEquals,
-  assertMatch,
-  assertStringIncludes,
-} from "jsr:@std/assert@1.0.19";
+import { assert, assertEquals, assertMatch, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../src/main.ts";
 
@@ -125,7 +120,9 @@ Deno.test("backup falls back on locked sqlite and logs warning", async () => {
 
   const writer = lockProc.stdin.getWriter();
   const encoder = new TextEncoder();
-  await writer.write(encoder.encode("PRAGMA locking_mode=EXCLUSIVE;\nBEGIN EXCLUSIVE;\nSELECT 1;\n"));
+  await writer.write(
+    encoder.encode("PRAGMA locking_mode=EXCLUSIVE;\nBEGIN EXCLUSIVE;\nSELECT 1;\n"),
+  );
 
   const result = await runCli(["backup", "daily"], {
     cwd: tempDir,
@@ -189,7 +186,9 @@ Deno.test("backup errors when profile path does not exist and no archive is crea
   await Deno.mkdir(configDir, { recursive: true });
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${join(tempDir, "missing-profile")}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    `[profile]\npath = "${
+      join(tempDir, "missing-profile")
+    }"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
   );
 
   const result = await runCli(["backup", "daily"], {
@@ -285,9 +284,18 @@ Deno.test("backup prunes local archives older than configured retention", async 
   await seedPlacesDatabase(join(profileDir, "places.sqlite"));
 
   await Deno.mkdir(join(backupDir, "daily"), { recursive: true });
-  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz"), new Uint8Array(16));
-  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-10.tar.gz"), new Uint8Array(16));
-  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-05.tar.gz"), new Uint8Array(16));
+  await Deno.writeFile(
+    join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz"),
+    new Uint8Array(16),
+  );
+  await Deno.writeFile(
+    join(backupDir, "daily", "zen-backup-daily-2026-01-10.tar.gz"),
+    new Uint8Array(16),
+  );
+  await Deno.writeFile(
+    join(backupDir, "daily", "zen-backup-daily-2026-01-05.tar.gz"),
+    new Uint8Array(16),
+  );
 
   const result = await runCli(["backup", "daily"], {
     cwd: tempDir,
@@ -300,9 +308,18 @@ Deno.test("backup prunes local archives older than configured retention", async 
   });
 
   assertEquals(result.exitCode, 0);
-  assertEquals(await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz")), true);
-  assertEquals(await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-10.tar.gz")), true);
-  assertEquals(await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-05.tar.gz")), false);
+  assertEquals(
+    await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz")),
+    true,
+  );
+  assertEquals(
+    await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-10.tar.gz")),
+    true,
+  );
+  assertEquals(
+    await pathExists(join(backupDir, "daily", "zen-backup-daily-2026-01-05.tar.gz")),
+    false,
+  );
 });
 
 Deno.test("backup prunes cloud archives older than configured retention", async () => {
@@ -315,7 +332,10 @@ Deno.test("backup prunes cloud archives older than configured retention", async 
   await seedPlacesDatabase(join(profileDir, "places.sqlite"));
 
   await Deno.mkdir(join(cloudRoot, "daily"), { recursive: true });
-  await Deno.writeFile(join(cloudRoot, "daily", "zen-backup-daily-2025-12-01.tar.gz"), new Uint8Array(16));
+  await Deno.writeFile(
+    join(cloudRoot, "daily", "zen-backup-daily-2025-12-01.tar.gz"),
+    new Uint8Array(16),
+  );
 
   const result = await runCli(["backup", "daily"], {
     cwd: tempDir,
@@ -328,7 +348,10 @@ Deno.test("backup prunes cloud archives older than configured retention", async 
   });
 
   assertEquals(result.exitCode, 0);
-  assertEquals(await pathExists(join(cloudRoot, "daily", "zen-backup-daily-2025-12-01.tar.gz")), false);
+  assertEquals(
+    await pathExists(join(cloudRoot, "daily", "zen-backup-daily-2025-12-01.tar.gz")),
+    false,
+  );
 });
 
 async function createWorkspace(

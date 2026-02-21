@@ -3,7 +3,8 @@
     "lineWidth": 100,
     "indentWidth": 2,
     "semiColons": true,
-    "singleQuote": false
+    "singleQuote": false,
+    "exclude": [".agents/skills", ".claude/skills", ".github/skills", "skills"]
   },
   "lint": {
     "rules": {

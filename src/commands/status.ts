@@ -10,7 +10,9 @@ import {
 import { queryScheduler } from "../platform/scheduler.ts";
 import type { RuntimeOptions } from "../types.ts";
 
-export async function runStatus(options: RuntimeOptions = {}): Promise<{ exitCode: number; stdout: string[]; stderr: string[] }> {
+export async function runStatus(
+  options: RuntimeOptions = {},
+): Promise<{ exitCode: number; stdout: string[]; stderr: string[] }> {
   const stdout: string[] = [];
   const stderr: string[] = [];
 
@@ -26,8 +28,14 @@ export async function runStatus(options: RuntimeOptions = {}): Promise<{ exitCod
     stdout.push("Zen Profile Backup Status");
     stdout.push(`Profile path: ${config.profile.path}`);
     stdout.push(`Backup directory: ${config.backup.local_path}`);
-    stdout.push(config.backup.cloud_path ? `Cloud sync: enabled (${config.backup.cloud_path})` : "Cloud sync: local only");
-    stdout.push(`Retention: daily ${config.retention.daily_days} days, weekly ${config.retention.weekly_days} days`);
+    stdout.push(
+      config.backup.cloud_path
+        ? `Cloud sync: enabled (${config.backup.cloud_path})`
+        : "Cloud sync: local only",
+    );
+    stdout.push(
+      `Retention: daily ${config.retention.daily_days} days, weekly ${config.retention.weekly_days} days`,
+    );
 
     const backupDirectoryExists = await exists(config.backup.local_path);
     if (!backupDirectoryExists) {
@@ -103,7 +111,9 @@ function dailyStalenessMessage(archiveName: string, now: Date): string | null {
   const date = archiveDate(archiveName);
   if (!date) return null;
 
-  const ageDays = Math.floor((now.getTime() - new Date(`${date}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000));
+  const ageDays = Math.floor(
+    (now.getTime() - new Date(`${date}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000),
+  );
   if (ageDays > 3) {
     return "Warning: latest daily backup is stale.";
   }

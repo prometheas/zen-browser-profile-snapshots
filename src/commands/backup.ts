@@ -32,7 +32,11 @@ export async function runBackup(
         message: `profile path not found: ${config.profile.path}`,
         env: options.env,
       });
-      throw new CliError(`profile path not found: ${config.profile.path}`, "ERR_PROFILE_NOT_FOUND", 1);
+      throw new CliError(
+        `profile path not found: ${config.profile.path}`,
+        "ERR_PROFILE_NOT_FOUND",
+        1,
+      );
     }
 
     if (options.env?.ZEN_BACKUP_BROWSER_RUNNING === "1") {
@@ -67,7 +71,9 @@ export async function runBackup(
     }
 
     let partialFailure = false;
-    const retentionDays = kind === "daily" ? config.retention.daily_days : config.retention.weekly_days;
+    const retentionDays = kind === "daily"
+      ? config.retention.daily_days
+      : config.retention.weekly_days;
     const now = options.now ?? new Date();
 
     const localPrune = await pruneArchives(config.backup.local_path, kind, retentionDays, now);

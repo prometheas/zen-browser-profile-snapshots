@@ -34,7 +34,9 @@ export async function runInstall(options: RuntimeOptions = {}): Promise<{
 
     const backupDefault = defaultBackupPath(os, home, runtimeEnv);
     stdout.push(`Default backup directory: ${backupDefault}`);
-    stdout.push("Cloud options: Google Drive, iCloud Drive, OneDrive, Dropbox, Custom path, None (local only)");
+    stdout.push(
+      "Cloud options: Google Drive, iCloud Drive, OneDrive, Dropbox, Custom path, None (local only)",
+    );
 
     const cloudPath = await detectCloudPath({ ...options, env: runtimeEnv }, os);
     const configText = toToml({
@@ -79,7 +81,12 @@ async function executableExists(
   }
   const probe = await new Deno.Command("sh", {
     args: ["-lc", `command -v ${name}`],
-    env: env ? Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<string, string> : undefined,
+    env: env
+      ? Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<
+        string,
+        string
+      >
+      : undefined,
     stdout: "null",
     stderr: "null",
   }).output();
@@ -130,8 +137,14 @@ async function detectCloudPath(options: RuntimeOptions, os: Platform): Promise<s
   const appData = options.env?.APPDATA ?? join(home, "AppData", "Roaming");
   const candidates = os === "darwin"
     ? [
-      { label: "Google Drive", path: join(home, "Library", "CloudStorage", "GoogleDrive-user@gmail.com", "My Drive") },
-      { label: "iCloud Drive", path: join(home, "Library", "Mobile Documents", "com~apple~CloudDocs") },
+      {
+        label: "Google Drive",
+        path: join(home, "Library", "CloudStorage", "GoogleDrive-user@gmail.com", "My Drive"),
+      },
+      {
+        label: "iCloud Drive",
+        path: join(home, "Library", "Mobile Documents", "com~apple~CloudDocs"),
+      },
       { label: "OneDrive", path: join(home, "Library", "CloudStorage", "OneDrive-Personal") },
       { label: "Dropbox", path: join(home, "Dropbox") },
     ]

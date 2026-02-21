@@ -41,7 +41,10 @@ Given("the user completes the install wizard", async function (this: ZenWorld) {
 Given("settings.toml exists", async function (this: ZenWorld) {
   const path = join(this.cwd, ".config", "zen-profile-backup", "settings.toml");
   await Deno.mkdir(join(this.cwd, ".config", "zen-profile-backup"), { recursive: true });
-  await Deno.writeTextFile(path, "[profile]\npath = \"profile\"\n\n[backup]\nlocal_path = \"backups\"\n");
+  await Deno.writeTextFile(
+    path,
+    '[profile]\npath = "profile"\n\n[backup]\nlocal_path = "backups"\n',
+  );
 });
 
 Given("backup archives exist in the backup directory", async function (this: ZenWorld) {
@@ -84,23 +87,30 @@ Given("the launchd agents are loaded", async function (this: ZenWorld) {
 Given("no launchd agents are loaded", async function (this: ZenWorld) {
   await ensurePlatformConfig(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
-  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.daily.plist")).catch(() => undefined);
-  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.weekly.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.daily.plist")).catch(() =>
+    undefined
+  );
+  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.weekly.plist")).catch(() =>
+    undefined
+  );
   await Deno.remove(join(agentsDir, ".zen-backup-loaded")).catch(() => undefined);
 });
 
-Given("notifications are disabled in configuration \\(notifications.enabled = false\\)", async function (this: ZenWorld) {
-  const profileDir = join(this.cwd, "profile");
-  const backupDir = join(this.cwd, "backups");
-  await Deno.mkdir(profileDir, { recursive: true });
-  await Deno.mkdir(backupDir, { recursive: true });
-  await createSqliteDb(join(profileDir, "places.sqlite"));
-  await Deno.writeTextFile(
-    join(this.cwd, "custom-settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n\n[notifications]\nenabled = false\n`,
-  );
-  this.env.ZEN_BACKUP_CONFIG = "custom-settings.toml";
-});
+Given(
+  "notifications are disabled in configuration \\(notifications.enabled = false\\)",
+  async function (this: ZenWorld) {
+    const profileDir = join(this.cwd, "profile");
+    const backupDir = join(this.cwd, "backups");
+    await Deno.mkdir(profileDir, { recursive: true });
+    await Deno.mkdir(backupDir, { recursive: true });
+    await createSqliteDb(join(profileDir, "places.sqlite"));
+    await Deno.writeTextFile(
+      join(this.cwd, "custom-settings.toml"),
+      `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n\n[notifications]\nenabled = false\n`,
+    );
+    this.env.ZEN_BACKUP_CONFIG = "custom-settings.toml";
+  },
+);
 
 When("the install command is run", async function (this: ZenWorld) {
   await runInstall(this);
@@ -219,9 +229,15 @@ Then("the installer continues to scheduling", function (this: ZenWorld) {
   assertStringIncludes(this.stdout.toLowerCase(), "scheduler");
 });
 
-Then("a settings.toml file exists at the platform config location", async function (this: ZenWorld) {
-  assertEquals(await exists(join(this.cwd, ".config", "zen-profile-backup", "settings.toml")), true);
-});
+Then(
+  "a settings.toml file exists at the platform config location",
+  async function (this: ZenWorld) {
+    assertEquals(
+      await exists(join(this.cwd, ".config", "zen-profile-backup", "settings.toml")),
+      true,
+    );
+  },
+);
 
 Then("the file contains [profile] section", async function (this: ZenWorld) {
   await assertSettingsContains(this, "[profile]");
@@ -251,25 +267,40 @@ Then("the plist files contain actual paths, not placeholders", async function (t
   assertEquals(daily.includes("$HOME"), false);
 });
 
-Then("{string} is removed from {string}", async function (this: ZenWorld, file: string, folder: string) {
-  const path = join(expandKnownPath(this, folder), normalizeLegacyName(file));
-  assertEquals(await exists(path), false);
-});
+Then(
+  "{string} is removed from {string}",
+  async function (this: ZenWorld, file: string, folder: string) {
+    const path = join(expandKnownPath(this, folder), normalizeLegacyName(file));
+    assertEquals(await exists(path), false);
+  },
+);
 
 Then("the agents are unloaded", async function (this: ZenWorld) {
-  assertEquals(await exists(join(this.cwd, "Library", "LaunchAgents", ".zen-backup-loaded")), false);
+  assertEquals(
+    await exists(join(this.cwd, "Library", "LaunchAgents", ".zen-backup-loaded")),
+    false,
+  );
 });
 
 Then("all backup archives still exist", async function (this: ZenWorld) {
-  assertEquals(await exists(join(this.cwd, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz")), true);
+  assertEquals(
+    await exists(join(this.cwd, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz")),
+    true,
+  );
 });
 
 Then("settings.toml still exists", async function (this: ZenWorld) {
-  assertEquals(await exists(join(this.cwd, ".config", "zen-profile-backup", "settings.toml")), true);
+  assertEquals(
+    await exists(join(this.cwd, ".config", "zen-profile-backup", "settings.toml")),
+    true,
+  );
 });
 
 Then("settings.toml does not exist", async function (this: ZenWorld) {
-  assertEquals(await exists(join(this.cwd, ".config", "zen-profile-backup", "settings.toml")), false);
+  assertEquals(
+    await exists(join(this.cwd, ".config", "zen-profile-backup", "settings.toml")),
+    false,
+  );
 });
 
 Then("the installer displays a permission error", function (this: ZenWorld) {
@@ -315,13 +346,16 @@ Then(
   },
 );
 
-Then("{string} is replaced with the user's home directory", async function (this: ZenWorld, token: string) {
-  const plist = await Deno.readTextFile(
-    join(this.cwd, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist"),
-  );
-  assertEquals(plist.includes(token), false);
-  assertStringIncludes(plist, this.cwd);
-});
+Then(
+  "{string} is replaced with the user's home directory",
+  async function (this: ZenWorld, token: string) {
+    const plist = await Deno.readTextFile(
+      join(this.cwd, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist"),
+    );
+    assertEquals(plist.includes(token), false);
+    assertStringIncludes(plist, this.cwd);
+  },
+);
 
 Then("a daily backup archive is created", async function (this: ZenWorld) {
   const dailyDir = join(this.cwd, "backups", "daily");
@@ -340,22 +374,28 @@ Then("stdout lists {string}", function (this: ZenWorld, value: string) {
   assertStringIncludes(this.stdout, normalizeLegacyName(value).replace(".plist", ""));
 });
 
-Then("a macOS notification is displayed with title {string}", async function (this: ZenWorld, title: string) {
-  const content = await readNotifications(this);
-  assertStringIncludes(content, title);
-  assertStringIncludes(content, "darwin");
-});
+Then(
+  "a macOS notification is displayed with title {string}",
+  async function (this: ZenWorld, title: string) {
+    const content = await readNotifications(this);
+    assertStringIncludes(content, title);
+    assertStringIncludes(content, "darwin");
+  },
+);
 
 Then("the notification contains {string}", async function (this: ZenWorld, value: string) {
   const content = await readNotifications(this);
   assertStringIncludes(content.toLowerCase(), value.toLowerCase());
 });
 
-Then("the notification contains {string} and {string}", async function (this: ZenWorld, a: string, b: string) {
-  const content = await readNotifications(this);
-  assertStringIncludes(content.toLowerCase(), a.toLowerCase());
-  assertStringIncludes(content.toLowerCase(), b.toLowerCase());
-});
+Then(
+  "the notification contains {string} and {string}",
+  async function (this: ZenWorld, a: string, b: string) {
+    const content = await readNotifications(this);
+    assertStringIncludes(content.toLowerCase(), a.toLowerCase());
+    assertStringIncludes(content.toLowerCase(), b.toLowerCase());
+  },
+);
 
 Then("the backup completes successfully", function (this: ZenWorld) {
   assertEquals(this.exitCode, 0);
@@ -419,7 +459,10 @@ async function ensurePlatformConfig(world: ZenWorld): Promise<void> {
 }
 
 function expandKnownPath(world: ZenWorld, raw: string): string {
-  return raw.replace("~", world.cwd).replace("%USERPROFILE%", world.cwd).replace("%APPDATA%", join(world.cwd, "AppData", "Roaming"));
+  return raw.replace("~", world.cwd).replace("%USERPROFILE%", world.cwd).replace(
+    "%APPDATA%",
+    join(world.cwd, "AppData", "Roaming"),
+  );
 }
 
 async function readNotifications(world: ZenWorld): Promise<string> {
@@ -434,7 +477,10 @@ async function assertSettingsContains(world: ZenWorld, value: string): Promise<v
 
 async function createSqliteDb(path: string): Promise<void> {
   const out = await new Deno.Command("sqlite3", {
-    args: [path, "CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT); INSERT INTO t(v) VALUES('x');"],
+    args: [
+      path,
+      "CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT); INSERT INTO t(v) VALUES('x');",
+    ],
     stdout: "null",
     stderr: "piped",
   }).output();

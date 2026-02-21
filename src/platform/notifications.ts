@@ -20,7 +20,9 @@ export async function notify(options: NotifyOptions): Promise<void> {
     backend = await notifyMacos(options);
   }
 
-  const line = `[${new Date().toISOString()}] ${options.os} (${backend}): ${options.title} :: ${options.message}\n`;
+  const line = `[${
+    new Date().toISOString()
+  }] ${options.os} (${backend}): ${options.title} :: ${options.message}\n`;
   await Deno.writeTextFile(path, line, { append: true });
 }
 
@@ -35,7 +37,9 @@ async function notifyMacos(options: NotifyOptions): Promise<string> {
     if (out.success) return "terminal-notifier";
   }
 
-  const script = `display notification "${escapeAppleScript(options.message)}" with title "${escapeAppleScript(options.title)}"`;
+  const script = `display notification "${escapeAppleScript(options.message)}" with title "${
+    escapeAppleScript(options.title)
+  }"`;
   const fallback = await new Deno.Command("osascript", {
     args: ["-e", script],
     stdout: "null",
@@ -47,7 +51,7 @@ async function notifyMacos(options: NotifyOptions): Promise<string> {
 }
 
 function escapeAppleScript(value: string): string {
-  return value.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"");
+  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
 
 async function executableExists(
@@ -59,7 +63,12 @@ async function executableExists(
   }
   const probe = await new Deno.Command("sh", {
     args: ["-lc", `command -v ${name}`],
-    env: env ? Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<string, string> : undefined,
+    env: env
+      ? Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<
+        string,
+        string
+      >
+      : undefined,
     stdout: "null",
     stderr: "null",
   }).output();

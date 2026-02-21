@@ -73,7 +73,9 @@ export async function loadConfig(options: ConfigLoadOptions = {}): Promise<AppCo
   const localPath = asStringOrDefault(backupRaw.local_path, "~/zen-backups", "backup.local_path");
 
   const cloudCandidate = backupRaw.cloud_path;
-  const cloudPath = cloudCandidate === undefined ? undefined : asString(cloudCandidate, "backup.cloud_path");
+  const cloudPath = cloudCandidate === undefined
+    ? undefined
+    : asString(cloudCandidate, "backup.cloud_path");
 
   return {
     profile: {
@@ -81,7 +83,9 @@ export async function loadConfig(options: ConfigLoadOptions = {}): Promise<AppCo
     },
     backup: {
       local_path: expandPath(localPath, env, configDir),
-      cloud_path: cloudPath && cloudPath.trim().length > 0 ? expandPath(cloudPath, env, configDir) : undefined,
+      cloud_path: cloudPath && cloudPath.trim().length > 0
+        ? expandPath(cloudPath, env, configDir)
+        : undefined,
     },
     retention: {
       daily_days: asNumberOrDefault(retentionRaw.daily_days, 30, "retention.daily_days"),
@@ -101,7 +105,9 @@ export async function loadConfig(options: ConfigLoadOptions = {}): Promise<AppCo
   };
 }
 
-function normalizeEnv(env?: Record<string, string | undefined>): Record<string, string | undefined> {
+function normalizeEnv(
+  env?: Record<string, string | undefined>,
+): Record<string, string | undefined> {
   if (env) {
     return { ...env };
   }

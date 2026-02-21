@@ -85,7 +85,9 @@ Deno.test("restore fails for corrupted archive and preserves profile", async () 
   assertEquals(await Deno.readTextFile(join(profileDir, "prefs.js")), "original");
 });
 
-async function createWorkspace(): Promise<{ tempDir: string; profileDir: string; backupDir: string }> {
+async function createWorkspace(): Promise<
+  { tempDir: string; profileDir: string; backupDir: string }
+> {
   const tempDir = await Deno.makeTempDir();
   const profileDir = join(tempDir, "profile");
   const backupDir = join(tempDir, "backups");
@@ -103,7 +105,10 @@ async function createWorkspace(): Promise<{ tempDir: string; profileDir: string;
   return { tempDir, profileDir, backupDir };
 }
 
-async function createArchiveWithFiles(archivePath: string, files: Record<string, string>): Promise<void> {
+async function createArchiveWithFiles(
+  archivePath: string,
+  files: Record<string, string>,
+): Promise<void> {
   const staging = await Deno.makeTempDir();
   for (const [name, content] of Object.entries(files)) {
     const path = join(staging, name);
@@ -128,7 +133,10 @@ async function createArchiveFromDir(archivePath: string, dir: string): Promise<v
 
 async function createSqliteDb(path: string): Promise<void> {
   const out = await new Deno.Command("sqlite3", {
-    args: [path, "CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT); INSERT INTO t(v) VALUES('x');"],
+    args: [
+      path,
+      "CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT); INSERT INTO t(v) VALUES('x');",
+    ],
     stdout: "null",
     stderr: "piped",
   }).output();

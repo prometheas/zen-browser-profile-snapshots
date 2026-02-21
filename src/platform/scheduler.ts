@@ -81,7 +81,10 @@ export async function queryScheduler(options: RuntimeOptions = {}): Promise<Sche
   return { installed: false, labels: [], states: {} };
 }
 
-async function installLaunchd(config: AppConfig, options: RuntimeOptions): Promise<SchedulerStatus> {
+async function installLaunchd(
+  config: AppConfig,
+  options: RuntimeOptions,
+): Promise<SchedulerStatus> {
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
   await Deno.mkdir(agentsDir, { recursive: true });
 
@@ -175,11 +178,13 @@ async function queryLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
       weeklyPaused = labelDisabled(disabled, WEEKLY_LABEL);
     }
     if (dailyInstalled) {
-      dailyLoaded = (await launchctlOptional(["print", `${domain}/${DAILY_LABEL}`], options)) !== null ||
+      dailyLoaded =
+        (await launchctlOptional(["print", `${domain}/${DAILY_LABEL}`], options)) !== null ||
         markerLoaded;
     }
     if (weeklyInstalled) {
-      weeklyLoaded = (await launchctlOptional(["print", `${domain}/${WEEKLY_LABEL}`], options)) !== null ||
+      weeklyLoaded =
+        (await launchctlOptional(["print", `${domain}/${WEEKLY_LABEL}`], options)) !== null ||
         markerLoaded;
     }
   } else {
@@ -285,7 +290,10 @@ async function commandOptional(
 function commandEnv(options: RuntimeOptions): Record<string, string> | undefined {
   const env = options.env;
   if (!env) return undefined;
-  return Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<string, string>;
+  return Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<
+    string,
+    string
+  >;
 }
 
 function resolveState(

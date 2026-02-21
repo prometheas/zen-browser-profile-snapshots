@@ -54,9 +54,18 @@ Deno.test("status shows latest daily and weekly backups with disk usage", async 
   await Deno.mkdir(join(backupDir, "weekly"), { recursive: true });
   await Deno.mkdir(profileDir, { recursive: true });
   await Deno.mkdir(configDir, { recursive: true });
-  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-14.tar.gz"), new Uint8Array(2048));
-  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz"), new Uint8Array(3072));
-  await Deno.writeFile(join(backupDir, "weekly", "zen-backup-weekly-2026-01-12.tar.gz"), new Uint8Array(1024));
+  await Deno.writeFile(
+    join(backupDir, "daily", "zen-backup-daily-2026-01-14.tar.gz"),
+    new Uint8Array(2048),
+  );
+  await Deno.writeFile(
+    join(backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz"),
+    new Uint8Array(3072),
+  );
+  await Deno.writeFile(
+    join(backupDir, "weekly", "zen-backup-weekly-2026-01-12.tar.gz"),
+    new Uint8Array(1024),
+  );
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
     `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
@@ -90,7 +99,10 @@ Deno.test("status reports active scheduled jobs marker and stale warning", async
   await Deno.mkdir(profileDir, { recursive: true });
   await Deno.mkdir(configDir, { recursive: true });
   await Deno.mkdir(agentsDir, { recursive: true });
-  await Deno.writeFile(join(backupDir, "daily", "zen-backup-daily-2026-01-01.tar.gz"), new Uint8Array(1024));
+  await Deno.writeFile(
+    join(backupDir, "daily", "zen-backup-daily-2026-01-01.tar.gz"),
+    new Uint8Array(1024),
+  );
   await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.daily.plist"), "<plist/>");
   await Deno.writeTextFile(join(agentsDir, "com.prometheas.zen-backup.weekly.plist"), "<plist/>");
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");

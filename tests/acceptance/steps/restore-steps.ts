@@ -1,9 +1,5 @@
 import { DataTable, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
-import {
-  assert,
-  assertEquals,
-  assertStringIncludes,
-} from "jsr:@std/assert@1.0.19";
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../../src/main.ts";
 import { ZenWorld } from "../support/world.ts";
@@ -27,13 +23,16 @@ Given("the archive contains:", async function (this: ZenWorld, table: DataTable)
   await writeArchiveFromEntries(this.restoreArchivePath, this.restoreEntries);
 });
 
-Given("the current profile directory exists with different content", async function (this: ZenWorld) {
-  await ensureRestoreWorkspace(this);
-  await Deno.writeTextFile(join(this.profileDir, "prefs.js"), "old prefs");
-  await Deno.writeTextFile(join(this.profileDir, "extensions.json"), '{"old":true}');
-  await Deno.writeTextFile(join(this.profileDir, "places.sqlite"), "old profile");
-  this.profileBeforeRestore = await snapshotProfile(this.profileDir);
-});
+Given(
+  "the current profile directory exists with different content",
+  async function (this: ZenWorld) {
+    await ensureRestoreWorkspace(this);
+    await Deno.writeTextFile(join(this.profileDir, "prefs.js"), "old prefs");
+    await Deno.writeTextFile(join(this.profileDir, "extensions.json"), '{"old":true}');
+    await Deno.writeTextFile(join(this.profileDir, "places.sqlite"), "old profile");
+    this.profileBeforeRestore = await snapshotProfile(this.profileDir);
+  },
+);
 
 Given("the Zen browser is not running", function (this: ZenWorld) {
   this.env.ZEN_BACKUP_BROWSER_RUNNING = undefined;
@@ -47,16 +46,19 @@ Given("a Zen browser process is running", function (this: ZenWorld) {
   this.env.ZEN_BACKUP_BROWSER_RUNNING = "1";
 });
 
-Given("the archive contains SQLite databases with multiple tables", async function (this: ZenWorld) {
-  this.restoreEntries["places.sqlite"] = "__SQLITE__";
-  this.restoreEntries["favicons.sqlite"] = "__SQLITE__";
-  await ensureRestoreWorkspace(this);
-  if (!this.restoreArchivePath) {
-    this.restoreArchiveName = "zen-backup-daily-2026-01-15.tar.gz";
-    this.restoreArchivePath = archivePathForName(this, this.restoreArchiveName);
-  }
-  await writeArchiveFromEntries(this.restoreArchivePath, this.restoreEntries);
-});
+Given(
+  "the archive contains SQLite databases with multiple tables",
+  async function (this: ZenWorld) {
+    this.restoreEntries["places.sqlite"] = "__SQLITE__";
+    this.restoreEntries["favicons.sqlite"] = "__SQLITE__";
+    await ensureRestoreWorkspace(this);
+    if (!this.restoreArchivePath) {
+      this.restoreArchiveName = "zen-backup-daily-2026-01-15.tar.gz";
+      this.restoreArchivePath = archivePathForName(this, this.restoreArchiveName);
+    }
+    await writeArchiveFromEntries(this.restoreArchivePath, this.restoreEntries);
+  },
+);
 
 Given("the current profile contains:", async function (this: ZenWorld, table: DataTable) {
   await ensureRestoreWorkspace(this);
@@ -112,11 +114,14 @@ Then("the profile directory contains {string}", async function (this: ZenWorld, 
   assertEquals(await exists(join(this.profileDir, file)), true);
 });
 
-Then("{string} in the profile passes {string}", async function (this: ZenWorld, file: string, _pragma: string) {
-  const dbPath = join(this.profileDir, file);
-  const out = await sqliteQuery(dbPath, "PRAGMA integrity_check;");
-  assertStringIncludes(out.toLowerCase(), "ok");
-});
+Then(
+  "{string} in the profile passes {string}",
+  async function (this: ZenWorld, file: string, _pragma: string) {
+    const dbPath = join(this.profileDir, file);
+    const out = await sqliteQuery(dbPath, "PRAGMA integrity_check;");
+    assertStringIncludes(out.toLowerCase(), "ok");
+  },
+);
 
 Then(
   "every {string} file in the profile passes {string}",
@@ -183,10 +188,13 @@ Then("no pre-restore directory is created", async function (this: ZenWorld) {
   assertEquals(dirs.length, 0);
 });
 
-Then("{string} in the profile contains {string}", async function (this: ZenWorld, file: string, value: string) {
-  const content = await Deno.readTextFile(join(this.profileDir, file));
-  assertStringIncludes(content, value);
-});
+Then(
+  "{string} in the profile contains {string}",
+  async function (this: ZenWorld, file: string, value: string) {
+    const content = await Deno.readTextFile(join(this.profileDir, file));
+    assertStringIncludes(content, value);
+  },
+);
 
 Then(
   "files are extracted to the profile directory, not absolute paths",
@@ -240,7 +248,10 @@ function archivePathForName(world: ZenWorld, name: string): string {
   return join(world.backupDir, kind, name);
 }
 
-async function writeArchiveFromEntries(path: string, entries: Record<string, string>): Promise<void> {
+async function writeArchiveFromEntries(
+  path: string,
+  entries: Record<string, string>,
+): Promise<void> {
   const staging = await Deno.makeTempDir();
   for (const [file, content] of Object.entries(entries)) {
     const fullPath = join(staging, file);
@@ -279,7 +290,11 @@ async function createSqliteDb(path: string): Promise<void> {
   }
 }
 
-async function writeProfileFixture(root: string, relativePath: string, content: string): Promise<void> {
+async function writeProfileFixture(
+  root: string,
+  relativePath: string,
+  content: string,
+): Promise<void> {
   const fullPath = join(root, relativePath);
   await Deno.mkdir(dirname(fullPath), { recursive: true });
   await Deno.writeTextFile(fullPath, content);

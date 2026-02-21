@@ -18,8 +18,18 @@ Deno.test("install writes config and macOS launchd plists", async () => {
   assertStringIncludes(result.stderr, "terminal-notifier");
 
   const configPath = join(tempDir, ".config", "zen-profile-backup", "settings.toml");
-  const dailyPlist = join(tempDir, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist");
-  const weeklyPlist = join(tempDir, "Library", "LaunchAgents", "com.prometheas.zen-backup.weekly.plist");
+  const dailyPlist = join(
+    tempDir,
+    "Library",
+    "LaunchAgents",
+    "com.prometheas.zen-backup.daily.plist",
+  );
+  const weeklyPlist = join(
+    tempDir,
+    "Library",
+    "LaunchAgents",
+    "com.prometheas.zen-backup.weekly.plist",
+  );
   assertEquals(await exists(configPath), true);
   assertEquals(await exists(dailyPlist), true);
   assertEquals(await exists(weeklyPlist), true);
@@ -31,7 +41,14 @@ Deno.test("install writes config and macOS launchd plists", async () => {
 
 Deno.test("install uses process HOME when runtime env is not overridden", async () => {
   const tempHome = await Deno.makeTempDir();
-  const profilePath = join(tempHome, "Library", "Application Support", "zen", "Profiles", "default");
+  const profilePath = join(
+    tempHome,
+    "Library",
+    "Application Support",
+    "zen",
+    "Profiles",
+    "default",
+  );
   await Deno.mkdir(profilePath, { recursive: true });
 
   const originalHome = Deno.env.get("HOME");
@@ -41,7 +58,12 @@ Deno.test("install uses process HOME when runtime env is not overridden", async 
     assertEquals(result.exitCode, 0);
 
     const configPath = join(tempHome, ".config", "zen-profile-backup", "settings.toml");
-    const dailyPlist = join(tempHome, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist");
+    const dailyPlist = join(
+      tempHome,
+      "Library",
+      "LaunchAgents",
+      "com.prometheas.zen-backup.daily.plist",
+    );
     assertEquals(await exists(configPath), true);
     assertEquals(await exists(dailyPlist), true);
   } finally {
@@ -59,17 +81,32 @@ Deno.test("uninstall removes schedule and settings, and preserves backups by def
   await Deno.mkdir(profilePath, { recursive: true });
   await runCli(["install"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
   await Deno.mkdir(join(tempDir, "zen-backups", "daily"), { recursive: true });
-  await Deno.writeTextFile(join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz"), "x");
+  await Deno.writeTextFile(
+    join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz"),
+    "x",
+  );
 
-  const result = await runCli(["uninstall"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const result = await runCli(["uninstall"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stderr, "--purge-backups");
 
   const configPath = join(tempDir, ".config", "zen-profile-backup", "settings.toml");
-  const dailyPlist = join(tempDir, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist");
+  const dailyPlist = join(
+    tempDir,
+    "Library",
+    "LaunchAgents",
+    "com.prometheas.zen-backup.daily.plist",
+  );
   assertEquals(await exists(configPath), false);
   assertEquals(await exists(dailyPlist), false);
-  assertEquals(await exists(join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz")), true);
+  assertEquals(
+    await exists(join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz")),
+    true,
+  );
 });
 
 Deno.test("schedule start/stop/status and aliases work", async () => {
@@ -78,25 +115,45 @@ Deno.test("schedule start/stop/status and aliases work", async () => {
   await Deno.mkdir(profilePath, { recursive: true });
   await runCli(["install"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
 
-  const stop = await runCli(["schedule", "stop"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const stop = await runCli(["schedule", "stop"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(stop.exitCode, 0);
   assertStringIncludes(stop.stdout, "stopped");
   assertStringIncludes(stop.stdout, "paused");
 
-  const resume = await runCli(["schedule", "resume"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const resume = await runCli(["schedule", "resume"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(resume.exitCode, 0);
   assertStringIncludes(resume.stdout, "started");
   assertStringIncludes(resume.stdout, "active");
 
-  const pauseAlias = await runCli(["schedule", "pause"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const pauseAlias = await runCli(["schedule", "pause"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(pauseAlias.exitCode, 0);
   assertStringIncludes(pauseAlias.stdout, "paused");
 
-  const startAlias = await runCli(["schedule", "start"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const startAlias = await runCli(["schedule", "start"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(startAlias.exitCode, 0);
   assertStringIncludes(startAlias.stdout, "active");
 
-  const status = await runCli(["schedule", "status"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const status = await runCli(["schedule", "status"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(status.exitCode, 0);
   assertStringIncludes(status.stdout, "com.prometheas.zen-backup.daily");
 });
@@ -107,26 +164,46 @@ Deno.test("schedule start/stop are idempotent", async () => {
   await Deno.mkdir(profilePath, { recursive: true });
   await runCli(["install"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
 
-  const firstStop = await runCli(["schedule", "stop"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const firstStop = await runCli(["schedule", "stop"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(firstStop.exitCode, 0);
   assertStringIncludes(firstStop.stdout, "paused");
 
-  const secondStop = await runCli(["schedule", "stop"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const secondStop = await runCli(["schedule", "stop"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(secondStop.exitCode, 0);
   assertStringIncludes(secondStop.stdout, "paused");
 
-  const firstStart = await runCli(["schedule", "start"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const firstStart = await runCli(["schedule", "start"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(firstStart.exitCode, 0);
   assertStringIncludes(firstStart.stdout, "active");
 
-  const secondStart = await runCli(["schedule", "start"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const secondStart = await runCli(["schedule", "start"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(secondStart.exitCode, 0);
   assertStringIncludes(secondStart.stdout, "active");
 });
 
 Deno.test("schedule status reports no jobs before install", async () => {
   const tempDir = await Deno.makeTempDir();
-  const result = await runCli(["schedule", "status"], { cwd: tempDir, os: "darwin", env: { HOME: tempDir } });
+  const result = await runCli(["schedule", "status"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir },
+  });
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "No scheduled jobs");
 });
@@ -167,7 +244,10 @@ Deno.test("backup writes notifications when browser running and cloud sync fails
 
 async function createSqliteDb(path: string): Promise<void> {
   const out = await new Deno.Command("sqlite3", {
-    args: [path, "CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT); INSERT INTO t(v) VALUES('x');"],
+    args: [
+      path,
+      "CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT); INSERT INTO t(v) VALUES('x');",
+    ],
     stdout: "null",
     stderr: "piped",
   }).output();

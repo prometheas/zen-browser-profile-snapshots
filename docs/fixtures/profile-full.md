@@ -6,46 +6,46 @@ Represents a complete Zen browser profile with all supported data types for comp
 
 ### SQLite Databases
 
-| Path | Description | Content |
-|------|-------------|---------|
-| `places.sqlite` | History and bookmarks | 10 bookmarks, 50 history entries |
-| `formhistory.sqlite` | Form autofill data | 5 form entries |
-| `permissions.sqlite` | Site permissions | 3 permission grants |
-| `content-prefs.sqlite` | Per-site preferences | 2 site preferences |
-| `favicons.sqlite` | Favicon cache | 5 favicons |
+| Path                   | Description           | Content                          |
+| ---------------------- | --------------------- | -------------------------------- |
+| `places.sqlite`        | History and bookmarks | 10 bookmarks, 50 history entries |
+| `formhistory.sqlite`   | Form autofill data    | 5 form entries                   |
+| `permissions.sqlite`   | Site permissions      | 3 permission grants              |
+| `content-prefs.sqlite` | Per-site preferences  | 2 site preferences               |
+| `favicons.sqlite`      | Favicon cache         | 5 favicons                       |
 
 ### Configuration Files
 
-| Path | Description | Content |
-|------|-------------|---------|
-| `prefs.js` | User preferences | 20 custom preferences |
-| `user.js` | User overrides | 5 override preferences |
-| `handlers.json` | Protocol handlers | Default handlers |
-| `search.json.mozlz4` | Search engines | Default + 1 custom engine |
-| `extensions.json` | Extension registry | 3 extensions registered |
-| `containers.json` | Container tabs | 2 custom containers |
+| Path                 | Description        | Content                   |
+| -------------------- | ------------------ | ------------------------- |
+| `prefs.js`           | User preferences   | 20 custom preferences     |
+| `user.js`            | User overrides     | 5 override preferences    |
+| `handlers.json`      | Protocol handlers  | Default handlers          |
+| `search.json.mozlz4` | Search engines     | Default + 1 custom engine |
+| `extensions.json`    | Extension registry | 3 extensions registered   |
+| `containers.json`    | Container tabs     | 2 custom containers       |
 
 ### Extension Data
 
-| Path | Description | Content |
-|------|-------------|---------|
-| `extensions/test@ext.xpi` | Installed extension | Mock extension package |
-| `browser-extension-data/test@ext/` | Extension storage | `{"setting": "value"}` |
-| `storage/default/moz-extension+++uuid/idb/` | Extension IndexedDB | 1 test database |
+| Path                                        | Description         | Content                |
+| ------------------------------------------- | ------------------- | ---------------------- |
+| `extensions/test@ext.xpi`                   | Installed extension | Mock extension package |
+| `browser-extension-data/test@ext/`          | Extension storage   | `{"setting": "value"}` |
+| `storage/default/moz-extension+++uuid/idb/` | Extension IndexedDB | 1 test database        |
 
 ### Session State
 
-| Path | Description | Content |
-|------|-------------|---------|
-| `sessionstore.jsonlz4` | Session state | 2 windows, 5 tabs each |
-| `sessionstore-backups/recovery.jsonlz4` | Recovery backup | Previous session |
+| Path                                    | Description     | Content                |
+| --------------------------------------- | --------------- | ---------------------- |
+| `sessionstore.jsonlz4`                  | Session state   | 2 windows, 5 tabs each |
+| `sessionstore-backups/recovery.jsonlz4` | Recovery backup | Previous session       |
 
 ### Zen-Specific
 
-| Path | Description | Content |
-|------|-------------|---------|
-| `zen-workspaces.json` | Workspace definitions | 3 workspaces |
-| `zen-keyboard-shortcuts.json` | Custom shortcuts | 5 shortcuts |
+| Path                          | Description           | Content      |
+| ----------------------------- | --------------------- | ------------ |
+| `zen-workspaces.json`         | Workspace definitions | 3 workspaces |
+| `zen-keyboard-shortcuts.json` | Custom shortcuts      | 5 shortcuts  |
 
 ## Explicitly Excluded
 

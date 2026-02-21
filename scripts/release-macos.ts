@@ -1,9 +1,9 @@
 import { join } from "jsr:@std/path@1.1.4";
 import {
   artifactPath,
+  type BuiltArtifact,
   renderReleaseNotes,
   writeChecksumsFile,
-  type BuiltArtifact,
 } from "../src/release/artifacts.ts";
 
 const DIST_DIR = "dist";

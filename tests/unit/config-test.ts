@@ -34,7 +34,8 @@ Deno.test("loadConfig applies defaults and expansion", async () => {
       HOME: "home_test",
       ZEN_BACKUP_CONFIG: "settings.toml",
     },
-    readTextFile: () => Promise.resolve(`
+    readTextFile: () =>
+      Promise.resolve(`
 [profile]
 path = "~/my-zen-profile"
 

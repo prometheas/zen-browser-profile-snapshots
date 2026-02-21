@@ -46,7 +46,9 @@ Deno.test("list errors when backup directory is missing", async () => {
   await Deno.mkdir(configDir, { recursive: true });
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${join(tempDir, "profile")}"\n\n[backup]\nlocal_path = "${join(tempDir, "missing-backups")}"\n`,
+    `[profile]\npath = "${join(tempDir, "profile")}"\n\n[backup]\nlocal_path = "${
+      join(tempDir, "missing-backups")
+    }"\n`,
   );
 
   const result = await runCli(["list"], {

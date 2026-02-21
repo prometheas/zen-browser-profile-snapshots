@@ -2,11 +2,15 @@
 
 ## Purpose
 
-This repo currently contains product specs only. When implementing, keep behavior consistent with the docs in `docs/`.
+This repo currently contains product specs only. When implementing, keep behavior consistent with
+the docs in `docs/`.
 
 ## Product Summary
 
-Zen Profile Backup is a cross-platform CLI (`zen-backup`) that creates daily/weekly compressed snapshots of a Zen browser profile, supports one-command restore, and integrates with native OS schedulers and notifications. SQLite files must be backed up via SQLite backup APIs (no raw file copy).
+Zen Profile Backup is a cross-platform CLI (`zen-backup`) that creates daily/weekly compressed
+snapshots of a Zen browser profile, supports one-command restore, and integrates with native OS
+schedulers and notifications. SQLite files must be backed up via SQLite backup APIs (no raw file
+copy).
 
 ## Stack Direction (Expected)
 
@@ -43,14 +47,18 @@ When implementation decisions change behavior, update the relevant docs in the s
 
 Story/spec boundary:
 
-- Keep `docs/product/user-stories.md` platform-agnostic (intent, outcomes, acceptance criteria at product level).
-- Put platform-specific behavior, tool choices, and OS mechanics in `docs/features/platform/**/*.feature`.
-- If a decision is macOS/Linux/Windows-specific, update the matching platform feature files, not the user stories.
+- Keep `docs/product/user-stories.md` platform-agnostic (intent, outcomes, acceptance criteria at
+  product level).
+- Put platform-specific behavior, tool choices, and OS mechanics in
+  `docs/features/platform/**/*.feature`.
+- If a decision is macOS/Linux/Windows-specific, update the matching platform feature files, not the
+  user stories.
 
 ## Quality Bar
 
 - Follow the Constitution: data safety first, fail loudly, restorable by default.
-- Keep behavior consistent across platforms, with platform-specific integrations isolated to adapters.
+- Keep behavior consistent across platforms, with platform-specific integrations isolated to
+  adapters.
 - Prefer explicit precondition checks and clear error messages.
 
 ## Commit Guidance

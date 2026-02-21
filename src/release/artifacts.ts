@@ -30,7 +30,9 @@ export async function writeChecksumsFile(
 }
 
 export function renderReleaseNotes(metadata: ReleaseMetadata, artifacts: BuiltArtifact[]): string {
-  const artifactLines = artifacts.map((artifact) => `- \`${basename(artifact.path)}\` (${artifact.target})`);
+  const artifactLines = artifacts.map((artifact) =>
+    `- \`${basename(artifact.path)}\` (${artifact.target})`
+  );
   return `# Zen Backup ${metadata.version}
 
 Release date: ${metadata.date}

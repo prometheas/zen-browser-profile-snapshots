@@ -4,11 +4,11 @@ Represents the smallest valid Zen browser profile for testing basic backup/resto
 
 ## Files
 
-| Path | Description | Content |
-|------|-------------|---------|
-| `places.sqlite` | Browsing history and bookmarks | 1 bookmark (<https://example.com>), 1 history entry |
-| `prefs.js` | User preferences | `user_pref("browser.startup.homepage", "about:home");` |
-| `extensions.json` | Extension registry | Empty extensions array `{"addons":[]}` |
+| Path              | Description                    | Content                                                |
+| ----------------- | ------------------------------ | ------------------------------------------------------ |
+| `places.sqlite`   | Browsing history and bookmarks | 1 bookmark (<https://example.com>), 1 history entry    |
+| `prefs.js`        | User preferences               | `user_pref("browser.startup.homepage", "about:home");` |
+| `extensions.json` | Extension registry             | Empty extensions array `{"addons":[]}`                 |
 
 ## SQLite Schema (places.sqlite)
 

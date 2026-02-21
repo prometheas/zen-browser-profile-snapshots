@@ -4,7 +4,10 @@ export interface SqliteBackupResult {
   usedFallback: boolean;
 }
 
-export async function backupSqliteDatabase(sourcePath: string, targetPath: string): Promise<SqliteBackupResult> {
+export async function backupSqliteDatabase(
+  sourcePath: string,
+  targetPath: string,
+): Promise<SqliteBackupResult> {
   await Deno.mkdir(dirname(targetPath), { recursive: true });
 
   const backupOutcome = await runSqliteCommand(sourcePath, `.backup ${sqliteQuote(targetPath)}`);

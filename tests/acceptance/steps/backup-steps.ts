@@ -1,10 +1,5 @@
 import { After, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
-import {
-  assert,
-  assertEquals,
-  assertMatch,
-  assertStringIncludes,
-} from "jsr:@std/assert@1.0.19";
+import { assert, assertEquals, assertMatch, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { DataTable } from "npm:@cucumber/cucumber@12.6.0";
 import { dirname, join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../../src/main.ts";
@@ -40,19 +35,22 @@ Given("a profile directory containing:", async function (this: ZenWorld, table: 
   await writeConfig(this, this.profileDir, this.backupDir);
 });
 
-Given("the profile directory additionally contains:", async function (this: ZenWorld, table: DataTable) {
-  if (!this.profileDir) {
-    this.profileDir = join(this.cwd, "profile");
-    await Deno.mkdir(this.profileDir, { recursive: true });
-  }
+Given(
+  "the profile directory additionally contains:",
+  async function (this: ZenWorld, table: DataTable) {
+    if (!this.profileDir) {
+      this.profileDir = join(this.cwd, "profile");
+      await Deno.mkdir(this.profileDir, { recursive: true });
+    }
 
-  const rows = table.hashes();
-  for (const row of rows) {
-    const path = row.file;
-    const content = row.content;
-    await writeProfileFixture(this.profileDir, path, content);
-  }
-});
+    const rows = table.hashes();
+    for (const row of rows) {
+      const path = row.file;
+      const content = row.content;
+      await writeProfileFixture(this.profileDir, path, content);
+    }
+  },
+);
 
 Given("a backup directory exists at the configured path", async function (this: ZenWorld) {
   if (!this.backupDir) {
@@ -128,24 +126,27 @@ Given("the configured profile path does not exist", async function (this: ZenWor
   await writeConfig(this, this.missingProfilePath, this.backupDir);
 });
 
-Given("{string} is exclusively locked by another process", async function (this: ZenWorld, file: string) {
-  const dbPath = join(this.profileDir, file);
-  const lockProc = new Deno.Command("sqlite3", {
-    args: [dbPath],
-    stdin: "piped",
-    stdout: "null",
-    stderr: "null",
-  }).spawn();
+Given(
+  "{string} is exclusively locked by another process",
+  async function (this: ZenWorld, file: string) {
+    const dbPath = join(this.profileDir, file);
+    const lockProc = new Deno.Command("sqlite3", {
+      args: [dbPath],
+      stdin: "piped",
+      stdout: "null",
+      stderr: "null",
+    }).spawn();
 
-  const writer = lockProc.stdin.getWriter();
-  const encoder = new TextEncoder();
-  await writer.write(
-    encoder.encode("PRAGMA locking_mode=EXCLUSIVE;\nBEGIN EXCLUSIVE;\nSELECT 1;\n"),
-  );
+    const writer = lockProc.stdin.getWriter();
+    const encoder = new TextEncoder();
+    await writer.write(
+      encoder.encode("PRAGMA locking_mode=EXCLUSIVE;\nBEGIN EXCLUSIVE;\nSELECT 1;\n"),
+    );
 
-  this.sqliteLockProcess = lockProc;
-  this.sqliteLockWriter = writer;
-});
+    this.sqliteLockProcess = lockProc;
+    this.sqliteLockWriter = writer;
+  },
+);
 
 When("a daily backup is attempted", async function (this: ZenWorld) {
   const result = await runCli(["backup", "daily"], {
@@ -164,25 +165,31 @@ When("a daily backup is attempted", async function (this: ZenWorld) {
   this.lastArchivePath = extractArchivePath(result.stdout);
 });
 
-Then("an archive exists matching pattern {string}", async function (this: ZenWorld, pattern: string) {
-  const regex = new RegExp(pattern);
-  const kind = pattern.includes("weekly") ? "weekly" : "daily";
-  const dir = join(this.backupDir, kind);
+Then(
+  "an archive exists matching pattern {string}",
+  async function (this: ZenWorld, pattern: string) {
+    const regex = new RegExp(pattern);
+    const kind = pattern.includes("weekly") ? "weekly" : "daily";
+    const dir = join(this.backupDir, kind);
 
-  let matched = false;
-  for await (const entry of Deno.readDir(dir)) {
-    if (entry.isFile && regex.test(entry.name)) {
-      matched = true;
-      this.lastArchivePath = join(dir, entry.name);
+    let matched = false;
+    for await (const entry of Deno.readDir(dir)) {
+      if (entry.isFile && regex.test(entry.name)) {
+        matched = true;
+        this.lastArchivePath = join(dir, entry.name);
+      }
     }
-  }
 
-  assert(matched, `Expected archive matching ${pattern} in ${dir}`);
-});
+    assert(matched, `Expected archive matching ${pattern} in ${dir}`);
+  },
+);
 
-Then("the archive is in the {string} subdirectory", function (this: ZenWorld, subdirectory: string) {
-  assertStringIncludes(this.lastArchivePath, `/${subdirectory}/`);
-});
+Then(
+  "the archive is in the {string} subdirectory",
+  function (this: ZenWorld, subdirectory: string) {
+    assertStringIncludes(this.lastArchivePath, `/${subdirectory}/`);
+  },
+);
 
 Then(
   "the archive exists in the local {string} subdirectory",
@@ -253,11 +260,14 @@ Then(
   },
 );
 
-Then("the extracted archive does not contain {string}", async function (this: ZenWorld, path: string) {
-  const entries = await listArchive(this.lastArchivePath);
-  const joined = entries.join("\n");
-  assertEquals(joined.includes(path), false);
-});
+Then(
+  "the extracted archive does not contain {string}",
+  async function (this: ZenWorld, path: string) {
+    const entries = await listArchive(this.lastArchivePath);
+    const joined = entries.join("\n");
+    assertEquals(joined.includes(path), false);
+  },
+);
 
 Then("the extracted archive contains {string}", async function (this: ZenWorld, path: string) {
   const entries = await listArchive(this.lastArchivePath);
@@ -265,11 +275,14 @@ Then("the extracted archive contains {string}", async function (this: ZenWorld, 
   assertStringIncludes(joined, path);
 });
 
-Then("the log contains {string} or {string}", async function (this: ZenWorld, a: string, b: string) {
-  const logPath = join(this.backupDir, "backup.log");
-  const content = await Deno.readTextFile(logPath);
-  assert(content.includes(a) || content.includes(b), `expected log to include ${a} or ${b}`);
-});
+Then(
+  "the log contains {string} or {string}",
+  async function (this: ZenWorld, a: string, b: string) {
+    const logPath = join(this.backupDir, "backup.log");
+    const content = await Deno.readTextFile(logPath);
+    assert(content.includes(a) || content.includes(b), `expected log to include ${a} or ${b}`);
+  },
+);
 
 Then("no cloud copy is attempted", async function (this: ZenWorld) {
   const cloudBase = join(this.cwd, "cloud-backups");
@@ -287,8 +300,8 @@ Then(
   async function (this: ZenWorld, path: string, pattern: string) {
     const resolvedPath = resolveStepPath(this, path);
     const content = await Deno.readTextFile(resolvedPath);
-  const regex = new RegExp(pattern);
-  assert(regex.test(content), `expected ${path} to match ${pattern}`);
+    const regex = new RegExp(pattern);
+    assert(regex.test(content), `expected ${path} to match ${pattern}`);
   },
 );
 
@@ -369,7 +382,11 @@ async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
   return new TextDecoder().decode(out.stdout);
 }
 
-async function writeProfileFixture(profileDir: string, relativePath: string, content: string): Promise<void> {
+async function writeProfileFixture(
+  profileDir: string,
+  relativePath: string,
+  content: string,
+): Promise<void> {
   const fullPath = join(profileDir, relativePath);
   await Deno.mkdir(dirname(fullPath), { recursive: true });
 

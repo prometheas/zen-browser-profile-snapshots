@@ -55,7 +55,10 @@ export function sortByChronologicalName(entries: ArchiveEntry[]): ArchiveEntry[]
   return [...entries].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function newestArchive(entries: ArchiveEntry[], kind: "daily" | "weekly"): ArchiveEntry | null {
+export function newestArchive(
+  entries: ArchiveEntry[],
+  kind: "daily" | "weekly",
+): ArchiveEntry | null {
   const filtered = sortByChronologicalName(entries.filter((entry) => entry.kind === kind));
   return filtered.length > 0 ? filtered[filtered.length - 1] : null;
 }

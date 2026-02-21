@@ -4,24 +4,33 @@ import { dirname, join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../../src/main.ts";
 import { ZenWorld } from "../support/world.ts";
 
-Given("the backup directory exists but contains no daily archives", async function (this: ZenWorld) {
-  await ensureInstalled(this);
-  await Deno.mkdir(join(this.backupDir, "weekly"), { recursive: true });
-});
+Given(
+  "the backup directory exists but contains no daily archives",
+  async function (this: ZenWorld) {
+    await ensureInstalled(this);
+    await Deno.mkdir(join(this.backupDir, "weekly"), { recursive: true });
+  },
+);
 
-Given("the backup directory exists but contains no weekly archives", async function (this: ZenWorld) {
-  await ensureInstalled(this);
-  await Deno.mkdir(join(this.backupDir, "daily"), { recursive: true });
-});
+Given(
+  "the backup directory exists but contains no weekly archives",
+  async function (this: ZenWorld) {
+    await ensureInstalled(this);
+    await Deno.mkdir(join(this.backupDir, "daily"), { recursive: true });
+  },
+);
 
-Given("the backup directory contains archives totaling {int} MB", async function (this: ZenWorld, sizeMb: number) {
-  await ensureInstalled(this);
-  await Deno.mkdir(join(this.backupDir, "daily"), { recursive: true });
-  await Deno.writeFile(
-    join(this.backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz"),
-    new Uint8Array(sizeMb * 1024 * 1024),
-  );
-});
+Given(
+  "the backup directory contains archives totaling {int} MB",
+  async function (this: ZenWorld, sizeMb: number) {
+    await ensureInstalled(this);
+    await Deno.mkdir(join(this.backupDir, "daily"), { recursive: true });
+    await Deno.writeFile(
+      join(this.backupDir, "daily", "zen-backup-daily-2026-01-15.tar.gz"),
+      new Uint8Array(sizeMb * 1024 * 1024),
+    );
+  },
+);
 
 Given("the backup scheduled jobs are installed", async function (this: ZenWorld) {
   await ensureInstalled(this);
@@ -35,8 +44,12 @@ Given("the backup scheduled jobs are installed", async function (this: ZenWorld)
 Given("no backup scheduled jobs are installed", async function (this: ZenWorld) {
   await ensureInstalled(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
-  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.daily.plist")).catch(() => undefined);
-  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.weekly.plist")).catch(() => undefined);
+  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.daily.plist")).catch(() =>
+    undefined
+  );
+  await Deno.remove(join(agentsDir, "com.prometheas.zen-backup.weekly.plist")).catch(() =>
+    undefined
+  );
   await Deno.remove(join(agentsDir, ".zen-backup-loaded")).catch(() => undefined);
 });
 
@@ -67,25 +80,34 @@ Given("settings.toml contains:", async function (this: ZenWorld, table: DataTabl
   await writeConfig(this);
 });
 
-Given("the most recent daily backup is less than {int} days old", async function (this: ZenWorld, days: number) {
-  await ensureInstalled(this);
-  this.now = new Date("2026-01-20T00:00:00Z");
-  await writeDailyArchiveForAge(this, Math.max(0, days - 1));
-});
+Given(
+  "the most recent daily backup is less than {int} days old",
+  async function (this: ZenWorld, days: number) {
+    await ensureInstalled(this);
+    this.now = new Date("2026-01-20T00:00:00Z");
+    await writeDailyArchiveForAge(this, Math.max(0, days - 1));
+  },
+);
 
-Given("the most recent daily backup is more than {int} days old", async function (this: ZenWorld, days: number) {
-  await ensureInstalled(this);
-  this.now = new Date("2026-01-20T00:00:00Z");
-  await writeDailyArchiveForAge(this, days + 1);
-});
+Given(
+  "the most recent daily backup is more than {int} days old",
+  async function (this: ZenWorld, days: number) {
+    await ensureInstalled(this);
+    this.now = new Date("2026-01-20T00:00:00Z");
+    await writeDailyArchiveForAge(this, days + 1);
+  },
+);
 
 Given("the backup directory contains no archives", async function (this: ZenWorld) {
   await ensureInstalled(this);
 });
 
-Given("the backup tool was installed more than {int} day ago", function (this: ZenWorld, _days: number) {
-  // Install timestamp is not tracked yet; this step is declarative for acceptance flow.
-});
+Given(
+  "the backup tool was installed more than {int} day ago",
+  function (this: ZenWorld, _days: number) {
+    // Install timestamp is not tracked yet; this step is declarative for acceptance flow.
+  },
+);
 
 Given("the configured backup directory does not exist", async function (this: ZenWorld) {
   await ensureInstalled(this);
@@ -113,7 +135,10 @@ Then("stdout contains disk usage information", function (this: ZenWorld) {
 });
 
 Then("the displayed usage is approximately {int} MB", function (this: ZenWorld, mb: number) {
-  assert(this.stdout.includes(`${mb}.0 MB`) || this.stdout.includes(`${mb} MB`), "expected MB usage");
+  assert(
+    this.stdout.includes(`${mb}.0 MB`) || this.stdout.includes(`${mb} MB`),
+    "expected MB usage",
+  );
 });
 
 Then("stdout shows daily directory size", function (this: ZenWorld) {
@@ -202,12 +227,11 @@ async function writeConfig(world: ZenWorld): Promise<void> {
   const cloudLine = world.cloudPath ? `cloud_path = "${world.cloudPath}"\n` : "";
   const daily = world.retentionDaily;
   const weekly = world.retentionWeekly;
-  const retention =
-    daily === undefined && weekly === undefined
-      ? ""
-      : `\n[retention]\n${daily === undefined ? "" : `daily_days = ${daily}\n`}${
-        weekly === undefined ? "" : `weekly_days = ${weekly}\n`
-      }`;
+  const retention = daily === undefined && weekly === undefined
+    ? ""
+    : `\n[retention]\n${daily === undefined ? "" : `daily_days = ${daily}\n`}${
+      weekly === undefined ? "" : `weekly_days = ${weekly}\n`
+    }`;
   await Deno.writeTextFile(
     configPath,
     `[profile]\npath = "${world.profileDir}"\n\n[backup]\nlocal_path = "${world.backupDir}"\n${cloudLine}${retention}`,

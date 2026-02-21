@@ -109,7 +109,11 @@ Then("stderr contains {string} or {string}", function (this: ZenWorld, a: string
   );
 });
 
-async function writeConfig(world: ZenWorld, profilePath: string, backupPath: string): Promise<void> {
+async function writeConfig(
+  world: ZenWorld,
+  profilePath: string,
+  backupPath: string,
+): Promise<void> {
   const configPath = world.resolvePath("custom/settings.toml");
   world.env.ZEN_BACKUP_CONFIG = "custom/settings.toml";
   await Deno.mkdir(dirname(configPath), { recursive: true });

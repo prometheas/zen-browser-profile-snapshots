@@ -151,12 +151,11 @@ async function writeConfig(world: ZenWorld): Promise<void> {
   await Deno.mkdir(dirname(configPath), { recursive: true });
   const daily = world.retentionDaily;
   const weekly = world.retentionWeekly;
-  const retention =
-    daily === undefined && weekly === undefined
-      ? ""
-      : `\n[retention]\n${daily === undefined ? "" : `daily_days = ${daily}\n`}${
-        weekly === undefined ? "" : `weekly_days = ${weekly}\n`
-      }`;
+  const retention = daily === undefined && weekly === undefined
+    ? ""
+    : `\n[retention]\n${daily === undefined ? "" : `daily_days = ${daily}\n`}${
+      weekly === undefined ? "" : `weekly_days = ${weekly}\n`
+    }`;
   const cloudLine = world.cloudPath ? `cloud_path = "${world.cloudPath}"\n` : "";
   await Deno.writeTextFile(
     configPath,
@@ -164,11 +163,19 @@ async function writeConfig(world: ZenWorld): Promise<void> {
   );
 }
 
-async function writeArchiveSet(world: ZenWorld, kind: "daily" | "weekly", table: DataTable): Promise<void> {
+async function writeArchiveSet(
+  world: ZenWorld,
+  kind: "daily" | "weekly",
+  table: DataTable,
+): Promise<void> {
   await writeArchiveSetToRoot(world.backupDir, kind, table);
 }
 
-async function writeArchiveSetToRoot(root: string, kind: "daily" | "weekly", table: DataTable): Promise<void> {
+async function writeArchiveSetToRoot(
+  root: string,
+  kind: "daily" | "weekly",
+  table: DataTable,
+): Promise<void> {
   const dir = join(root, kind);
   await Deno.mkdir(dir, { recursive: true });
   for (const row of table.hashes()) {
@@ -179,7 +186,9 @@ async function writeArchiveSetToRoot(root: string, kind: "daily" | "weekly", tab
 
 function deriveClockFromAges(world: ZenWorld, table: DataTable): void {
   const rows = table.hashes();
-  const withAges = rows.filter((row) => row.age_days !== undefined && row.age_days.trim().length > 0);
+  const withAges = rows.filter((row) =>
+    row.age_days !== undefined && row.age_days.trim().length > 0
+  );
   if (withAges.length === 0) return;
 
   const first = withAges[0];
