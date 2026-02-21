@@ -30,6 +30,10 @@ copy).
 - `resources/`
 - `tests/`
 
+## Key Skills
+
+CRITICAL: always load and follow the using-superpowers skill.
+
 ## Source of Truth
 
 Use these docs as the primary requirements:
