@@ -2,6 +2,7 @@
 .deno/
 coverage/
 
-.worktrees/
+/.worktrees/
+**/worktrees/
 
 dist/
