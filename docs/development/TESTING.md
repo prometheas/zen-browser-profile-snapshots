@@ -50,6 +50,9 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - `deno task test:acceptance:platform:windows`
 - Milestone 1 acceptance subset:
   - `deno task test:acceptance:m1`
+- Native scheduler smoke tests:
+  - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:macos:scheduler`
+  - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:windows:scheduler`
 
 ## Recommended Run Order
 
@@ -66,6 +69,9 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - `deno task test:acceptance:platform:macos`
 - Before Linux beta cut:
   - `deno task test:acceptance:platform:linux`
+- Before Windows beta cut:
+  - `deno task test:acceptance:platform:windows`
+  - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:windows:scheduler`
 
 ## Acceptance Runtime Notes
 
