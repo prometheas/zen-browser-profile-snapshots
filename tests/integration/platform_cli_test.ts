@@ -29,6 +29,28 @@ Deno.test("install writes config and macOS launchd plists", async () => {
   assertStringIncludes(dailyContent, tempDir);
 });
 
+Deno.test("install uses process HOME when runtime env is not overridden", async () => {
+  const tempHome = await Deno.makeTempDir();
+  const profilePath = join(tempHome, "Library", "Application Support", "zen", "Profiles", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+
+  const originalHome = Deno.env.get("HOME");
+  try {
+    Deno.env.set("HOME", tempHome);
+    const result = await runCli(["install"], { cwd: await Deno.makeTempDir(), os: "darwin" });
+    assertEquals(result.exitCode, 0);
+
+    const configPath = join(tempHome, ".config", "zen-profile-backup", "settings.toml");
+    assertEquals(await exists(configPath), true);
+  } finally {
+    if (originalHome === undefined) {
+      Deno.env.delete("HOME");
+    } else {
+      Deno.env.set("HOME", originalHome);
+    }
+  }
+});
+
 Deno.test("uninstall removes schedule and settings, and preserves backups by default", async () => {
   const tempDir = await Deno.makeTempDir();
   const profilePath = join(tempDir, "Library", "Application Support", "zen", "Profiles", "default");

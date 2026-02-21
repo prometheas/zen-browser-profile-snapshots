@@ -12,16 +12,17 @@ export async function runInstall(options: RuntimeOptions = {}): Promise<{
   const stderr: string[] = [];
 
   try {
+    const runtimeEnv = options.env ?? Deno.env.toObject();
     const os = options.os ?? (Deno.build.os as Platform);
-    const home = options.env?.HOME ?? options.env?.USERPROFILE ?? Deno.cwd();
-    const configPath = resolveConfigPathForInstall(os, home, options.env);
+    const home = runtimeEnv.HOME ?? runtimeEnv.USERPROFILE ?? Deno.cwd();
+    const configPath = resolveConfigPathForInstall(os, home, runtimeEnv);
     await Deno.mkdir(dirname(configPath), { recursive: true });
 
     if (options.env?.ZEN_BACKUP_SIMULATE_CONFIG_PERMISSION_DENIED === "1") {
       throw new Error("Permission denied writing config directory");
     }
 
-    const profilePath = await detectProfilePath(options);
+    const profilePath = await detectProfilePath({ ...options, env: runtimeEnv });
     if (profilePath) {
       stdout.push(`Detected profile path: ${profilePath}`);
       stdout.push("User input for profile path not required.");
@@ -31,11 +32,11 @@ export async function runInstall(options: RuntimeOptions = {}): Promise<{
       stdout.push("Custom path is accepted.");
     }
 
-    const backupDefault = defaultBackupPath(os, home, options.env);
+    const backupDefault = defaultBackupPath(os, home, runtimeEnv);
     stdout.push(`Default backup directory: ${backupDefault}`);
     stdout.push("Cloud options: Google Drive, iCloud Drive, OneDrive, Dropbox, Custom path, None (local only)");
 
-    const cloudPath = await detectCloudPath(options, os);
+    const cloudPath = await detectCloudPath({ ...options, env: runtimeEnv }, os);
     const configText = toToml({
       profile: { path: profilePath ?? join(home, "zen-profile") },
       backup: { local_path: backupDefault, cloud_path: cloudPath },
@@ -46,7 +47,7 @@ export async function runInstall(options: RuntimeOptions = {}): Promise<{
     });
     await Deno.writeTextFile(configPath, configText);
 
-    const config = await loadConfig({ ...options, required: true });
+    const config = await loadConfig({ ...options, env: runtimeEnv, required: true });
     if (!config) throw new Error("failed to load written config");
     const scheduler = await installScheduler(config, options);
     if (scheduler.installed) {
@@ -55,7 +56,7 @@ export async function runInstall(options: RuntimeOptions = {}): Promise<{
     }
 
     if (os === "darwin") {
-      const hasTerminalNotifier = await executableExists("terminal-notifier", options.env);
+      const hasTerminalNotifier = await executableExists("terminal-notifier", runtimeEnv);
       if (!hasTerminalNotifier) {
         stderr.push(
           "Optional: install `terminal-notifier` for improved native notifications (fallback to osascript is used).",
