@@ -672,7 +672,14 @@ async function queryWindowsTaskReal(
     escapePowerShellSingleQuoted(taskName)
   }' -ErrorAction SilentlyContinue; if ($null -eq $task) { '{"installed":false,"enabled":false}' } else { [pscustomobject]@{installed=$true;enabled=[bool]$task.Settings.Enabled} | ConvertTo-Json -Compress }`;
   const json = await powerShellOptional(script, options);
-  if (!json) return { installed: false, enabled: false };
+  if (!json) {
+    const xml = await schtasksOptional(["/Query", "/TN", taskName, "/XML"], options);
+    if (!xml) return { installed: false, enabled: false };
+    return {
+      installed: true,
+      enabled: parseWindowsTaskEnabledFromXml(xml),
+    };
+  }
   try {
     const parsed = JSON.parse(json.trim()) as { installed?: boolean; enabled?: boolean };
     return {
@@ -680,7 +687,12 @@ async function queryWindowsTaskReal(
       enabled: parsed.enabled === true,
     };
   } catch {
-    return { installed: false, enabled: false };
+    const xml = await schtasksOptional(["/Query", "/TN", taskName, "/XML"], options);
+    if (!xml) return { installed: false, enabled: false };
+    return {
+      installed: true,
+      enabled: parseWindowsTaskEnabledFromXml(xml),
+    };
   }
 }
 
@@ -746,6 +758,12 @@ async function powerShellOptional(script: string, options: RuntimeOptions): Prom
 
 function escapePowerShellSingleQuoted(value: string): string {
   return value.replaceAll("'", "''");
+}
+
+export function parseWindowsTaskEnabledFromXml(xml: string): boolean {
+  const match = /<Enabled>\s*(true|false)\s*<\/Enabled>/i.exec(xml);
+  if (!match) return true;
+  return match[1].toLowerCase() === "true";
 }
 
 function windowsWeekday(day: string): string {
