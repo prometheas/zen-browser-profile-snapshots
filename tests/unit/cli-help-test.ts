@@ -26,27 +26,21 @@ Deno.test("subcommand --help renders command help and exits zero", async () => {
 });
 
 Deno.test("global -v renders version and exits zero", async () => {
-  const result = await runCli(["-v"], {
-    env: { ZEN_BACKUP_VERSION: "v9.9.9", NO_COLOR: "1" },
-  });
+  const result = await runCli(["-v"], { env: { NO_COLOR: "1" }, version: "v9.9.9" });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
   assertEquals(result.stdout, "9.9.9");
 });
 
 Deno.test("global --version renders version and exits zero", async () => {
-  const result = await runCli(["--version"], {
-    env: { ZEN_BACKUP_VERSION: "v9.9.8", NO_COLOR: "1" },
-  });
+  const result = await runCli(["--version"], { env: { NO_COLOR: "1" }, version: "v9.9.8" });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
   assertEquals(result.stdout, "9.9.8");
 });
 
 Deno.test("global --version keeps production output uncolored", async () => {
-  const result = await runCli(["--version"], {
-    env: { ZEN_BACKUP_VERSION: "v1.2.3", CLICOLOR_FORCE: "1" },
-  });
+  const result = await runCli(["--version"], { env: { CLICOLOR_FORCE: "1" }, version: "v1.2.3" });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
   assertEquals(result.stdout, "1.2.3");
@@ -54,7 +48,8 @@ Deno.test("global --version keeps production output uncolored", async () => {
 
 Deno.test("global --version styles preview channel and hash", async () => {
   const result = await runCli(["--version"], {
-    env: { ZEN_BACKUP_VERSION: "v1.2.3-beta.1-5-gabc1234", CLICOLOR_FORCE: "1" },
+    env: { CLICOLOR_FORCE: "1" },
+    version: "v1.2.3-beta.1-5-gabc1234",
   });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
@@ -65,7 +60,8 @@ Deno.test("global --version styles preview channel and hash", async () => {
 
 Deno.test("global --version uses red channel for alpha", async () => {
   const result = await runCli(["--version"], {
-    env: { ZEN_BACKUP_VERSION: "v1.2.3-alpha.2-1-gdef5678", CLICOLOR_FORCE: "1" },
+    env: { CLICOLOR_FORCE: "1" },
+    version: "v1.2.3-alpha.2-1-gdef5678",
   });
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "\u001b[1;31malpha\u001b[0m.2");
@@ -73,7 +69,8 @@ Deno.test("global --version uses red channel for alpha", async () => {
 
 Deno.test("global --version preview stays plain when color disabled", async () => {
   const result = await runCli(["--version"], {
-    env: { ZEN_BACKUP_VERSION: "v1.2.3-beta.1-7-gec48680", NO_COLOR: "1" },
+    env: { NO_COLOR: "1" },
+    version: "v1.2.3-beta.1-7-gec48680",
   });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stdout, "1.2.3-beta.1-7-gec48680");

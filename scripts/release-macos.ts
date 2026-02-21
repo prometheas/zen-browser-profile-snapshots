@@ -5,6 +5,7 @@ import {
   renderReleaseNotes,
   writeChecksumsFile,
 } from "../src/release/artifacts.ts";
+import { withEmbeddedVersion } from "./embedded-version.ts";
 
 const DIST_DIR = "dist";
 const TARGETS = ["aarch64-apple-darwin", "x86_64-apple-darwin"] as const;
@@ -13,22 +14,26 @@ const INSTALLER_DMG_NAME = "zen-backup-macos-installer.dmg";
 
 if (import.meta.main) {
   await Deno.mkdir(DIST_DIR, { recursive: true });
+  const version = releaseVersion();
 
-  const artifacts: BuiltArtifact[] = [];
-  for (const target of TARGETS) {
-    const outputPath = artifactPath(DIST_DIR, target);
-    await compileBinary(target, outputPath);
-    await smokeCheckBinary(outputPath);
-    artifacts.push({ path: outputPath, target });
-  }
+  const artifacts: BuiltArtifact[] = await withEmbeddedVersion(version, async () => {
+    const built: BuiltArtifact[] = [];
+    for (const target of TARGETS) {
+      const outputPath = artifactPath(DIST_DIR, target);
+      await compileBinary(target, outputPath);
+      await smokeCheckBinary(outputPath);
+      built.push({ path: outputPath, target });
+    }
 
-  const installerArtifacts = await buildMacosInstallerArtifacts(DIST_DIR);
-  artifacts.push(...installerArtifacts);
+    const installerArtifacts = await buildMacosInstallerArtifacts(DIST_DIR);
+    built.push(...installerArtifacts);
+    return built;
+  });
 
   await writeChecksumsFile(join(DIST_DIR, "checksums-macos.txt"), artifacts);
 
   const metadata = {
-    version: releaseVersion(),
+    version,
     date: new Date().toISOString().slice(0, 10),
     commit: await gitCommitSha(),
   };

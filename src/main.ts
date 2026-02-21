@@ -36,9 +36,7 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
     };
   }
   if (args[0] === "-v" || args[0] === "--version" || args[0] === "version") {
-    const version = env.ZEN_BACKUP_VERSION?.trim().length
-      ? env.ZEN_BACKUP_VERSION.trim()
-      : await resolveVersion();
+    const version = options.version ?? await resolveVersion();
     return {
       exitCode: 0,
       stdout: formatVersionOutput(version, color),

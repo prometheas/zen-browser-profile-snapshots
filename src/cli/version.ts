@@ -1,6 +1,9 @@
+import { EMBEDDED_VERSION } from "../generated/version.ts";
+
 export async function resolveVersion(): Promise<string> {
-  const fromEnv = Deno.env.get("ZEN_BACKUP_VERSION");
-  if (fromEnv && fromEnv.trim().length > 0) return fromEnv.trim();
+  if (EMBEDDED_VERSION !== "dev") {
+    return EMBEDDED_VERSION;
+  }
 
   const git = await new Deno.Command("git", {
     args: ["describe", "--tags", "--always", "--dirty"],

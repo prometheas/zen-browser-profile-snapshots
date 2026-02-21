@@ -1,30 +1,35 @@
 import { join } from "jsr:@std/path@1.1.4";
 import { artifactPath, type BuiltArtifact, writeChecksumsFile } from "../src/release/artifacts.ts";
+import { withEmbeddedVersion } from "./embedded-version.ts";
 
 const distDir = "dist";
 const targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"] as const;
 
 if (import.meta.main) {
   await Deno.mkdir(distDir, { recursive: true });
+  const version = releaseVersion();
 
-  const artifacts: BuiltArtifact[] = [];
-  for (const target of targets) {
-    const outputPath = artifactPath(distDir, target);
-    await compileBinary(target, outputPath);
-    if (canExecuteOnCurrentHost(target)) {
-      await smokeCheckBinary(outputPath);
-    } else {
-      console.log(`Skipping smoke check for ${target} on ${Deno.build.arch}-${Deno.build.os}`);
+  const artifacts: BuiltArtifact[] = await withEmbeddedVersion(version, async () => {
+    const built: BuiltArtifact[] = [];
+    for (const target of targets) {
+      const outputPath = artifactPath(distDir, target);
+      await compileBinary(target, outputPath);
+      if (canExecuteOnCurrentHost(target)) {
+        await smokeCheckBinary(outputPath);
+      } else {
+        console.log(`Skipping smoke check for ${target} on ${Deno.build.arch}-${Deno.build.os}`);
+      }
+      built.push({ path: outputPath, target });
     }
-    artifacts.push({ path: outputPath, target });
-  }
+    return built;
+  });
 
   await writeChecksumsFile(join(distDir, "checksums-linux.txt"), artifacts);
   await Deno.writeTextFile(
     join(distDir, "release-notes-linux.md"),
     renderLinuxReleaseNotes(
       {
-        version: releaseVersion(),
+        version,
         date: new Date().toISOString().slice(0, 10),
         commit: await gitCommitSha(),
       },

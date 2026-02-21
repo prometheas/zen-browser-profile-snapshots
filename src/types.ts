@@ -30,6 +30,7 @@ export interface RuntimeOptions {
   os?: Platform;
   cwd?: string;
   now?: Date;
+  version?: string;
 }
 
 export interface CommandResult {
