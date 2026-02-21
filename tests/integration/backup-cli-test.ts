@@ -188,7 +188,7 @@ Deno.test("backup errors when profile path does not exist and no archive is crea
     join(configDir, "settings.toml"),
     `[profile]\npath = "${
       join(tempDir, "missing-profile")
-    }"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    }"\n\n[backup]\nlocal_path = "${backupDir}"\n\n[notifications]\nenabled = false\n`,
   );
 
   const result = await runCli(["backup", "daily"], {
@@ -372,7 +372,7 @@ async function createWorkspace(
   const retention = options.retention ?? { daily_days: 30, weekly_days: 84 };
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n${cloudLine}\n[retention]\ndaily_days = ${retention.daily_days}\nweekly_days = ${retention.weekly_days}\n`,
+    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n${cloudLine}\n[retention]\ndaily_days = ${retention.daily_days}\nweekly_days = ${retention.weekly_days}\n\n[notifications]\nenabled = false\n`,
   );
 
   return { tempDir, profileDir, backupDir };

@@ -73,8 +73,10 @@ Deno.test("install uses process HOME when runtime env is not overridden", async 
   await Deno.mkdir(profilePath, { recursive: true });
 
   const originalHome = Deno.env.get("HOME");
+  const originalSimulatedLaunchctl = Deno.env.get("ZEN_BACKUP_FORCE_SIMULATED_LAUNCHCTL");
   try {
     Deno.env.set("HOME", tempHome);
+    Deno.env.set("ZEN_BACKUP_FORCE_SIMULATED_LAUNCHCTL", "1");
     const result = await runCli(["install"], { cwd: await Deno.makeTempDir(), os: "darwin" });
     assertEquals(result.exitCode, 0);
 
@@ -88,6 +90,11 @@ Deno.test("install uses process HOME when runtime env is not overridden", async 
     assertEquals(await exists(configPath), true);
     assertEquals(await exists(dailyPlist), true);
   } finally {
+    if (originalSimulatedLaunchctl === undefined) {
+      Deno.env.delete("ZEN_BACKUP_FORCE_SIMULATED_LAUNCHCTL");
+    } else {
+      Deno.env.set("ZEN_BACKUP_FORCE_SIMULATED_LAUNCHCTL", originalSimulatedLaunchctl);
+    }
     if (originalHome === undefined) {
       Deno.env.delete("HOME");
     } else {
@@ -335,6 +342,8 @@ Deno.test("backup writes notifications when browser running and cloud sync fails
       HOME: tempDir,
       ZEN_BACKUP_CONFIG: "custom/settings.toml",
       ZEN_BACKUP_BROWSER_RUNNING: "1",
+      ZEN_BACKUP_FORCE_NO_TERMINAL_NOTIFIER: "1",
+      ZEN_BACKUP_FORCE_NO_OSASCRIPT: "1",
     },
   });
   assertEquals(result.exitCode, 1);
