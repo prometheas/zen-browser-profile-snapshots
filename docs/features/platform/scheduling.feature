@@ -196,3 +196,33 @@ Feature: Scheduling
     When "zen-backup schedule status" is run
     Then stdout lists "zen-backup-daily.timer"
     And stdout lists "zen-backup-weekly.timer"
+
+  @windows
+  Scenario: Schedule stop disables scheduled tasks without uninstalling
+    Given the backup tool is installed
+    When "zen-backup schedule stop" is run
+    Then stdout lists "ZenBackupDaily: paused"
+    And stdout lists "ZenBackupWeekly: paused"
+
+  @windows
+  Scenario: Schedule start enables paused tasks
+    Given the backup tool is installed
+    And "zen-backup schedule stop" was run
+    When "zen-backup schedule start" is run
+    Then stdout lists "ZenBackupDaily: active"
+    And stdout lists "ZenBackupWeekly: active"
+
+  @windows
+  Scenario: Schedule aliases map to primary commands on Windows
+    Given the backup tool is installed
+    When "zen-backup schedule pause" is run
+    Then stdout lists "paused"
+    When "zen-backup schedule resume" is run
+    Then stdout lists "active"
+
+  @windows
+  Scenario: Schedule status reports daily and weekly task states
+    Given the backup tool is installed
+    When "zen-backup schedule status" is run
+    Then stdout lists "ZenBackupDaily"
+    And stdout lists "ZenBackupWeekly"
