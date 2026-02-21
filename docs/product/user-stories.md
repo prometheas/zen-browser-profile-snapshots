@@ -1,5 +1,8 @@
 # Zen Profile Backup — User Stories
 
+> Platform-specific tool choices and OS mechanics are defined in
+> `docs/features/platform/**/*.feature`. User stories here stay product-level and platform-agnostic.
+
 ## Scheduling
 
 ### US-01 Automatic Daily Backups
@@ -12,7 +15,7 @@ don't have to remember to back up my profile manually
 - A scheduled task fires a daily backup at a configurable time (default: 12:30, local time)
 - The backup runs without any user interaction
 - Output is written to a log file
-- Works via native OS scheduler: launchd (macOS), systemd timer (Linux), Task Scheduler (Windows)
+- Works through the platform's native scheduling mechanism
 
 ---
 
@@ -26,7 +29,7 @@ have long-term snapshots I can roll back to weeks later
 - A scheduled task fires a weekly backup at a configurable time (default: 02:00 Sunday, local time)
 - The backup is stored separately from daily archives
 - Output is written to a log file
-- Works via native OS scheduler: launchd (macOS), systemd timer (Linux), Task Scheduler (Windows)
+- Works through the platform's native scheduling mechanism
 
 ---
 
@@ -166,8 +169,7 @@ folder **So that** my backups survive a local disk failure
 - When `cloud_path` points to a cloud-synced folder, each new archive is copied there after local
   creation
 - The cloud directory mirrors the `daily/` and `weekly/` structure
-- Supported providers: Google Drive, OneDrive, Dropbox, or any folder
-- iCloud Drive supported on macOS only
+- Supported providers are platform-dependent and documented in platform feature files
 
 ---
 
@@ -265,7 +267,7 @@ I don't corrupt my active browser session
 - If a running Zen process is detected, restore exits with a non-zero status
 - An error message is printed: "Zen browser must be closed before restoring"
 - The current profile is not modified in any way
-- Detection works across platforms: pgrep (macOS/Linux), tasklist/Get-Process (Windows)
+- Detection works across supported platforms
 
 ---
 
@@ -337,15 +339,12 @@ I can audit history and diagnose failures
 
 ### US-22 TOML-Based Configuration
 
-**As a** Zen browser user **I want** to configure all paths and retention settings via a TOML file
-**So that** I can customise the tool without editing source code
+**As a** Zen browser user **I want** to configure paths and retention settings via a TOML file **So
+that** I can customise the tool without editing source code
 
 **Acceptance criteria:**
 
-- The config file lives at platform-appropriate location:
-  - macOS: `~/.config/zen-profile-backup/settings.toml`
-  - Linux: `~/.config/zen-profile-backup/settings.toml`
-  - Windows: `%APPDATA%\zen-profile-backup\settings.toml`
+- The config file lives at a platform-appropriate default location
 - It supports sections `[profile]`, `[backup]`, `[retention]`, `[schedule]`, and `[notifications]`
 - Tilde (`~`) and environment variables in path values are expanded
 - Quoted and unquoted values are both handled correctly
@@ -373,10 +372,7 @@ through setup **So that** configuration and scheduling are ready without manual 
 
 **Acceptance criteria:**
 
-- `zen-backup install` auto-detects the profile directory at platform-specific location:
-  - macOS: `~/Library/Application Support/zen/Profiles/`
-  - Linux: `~/.zen/` or `~/.config/zen/`
-  - Windows: `%APPDATA%\zen\Profiles\`
+- `zen-backup install` auto-detects the profile directory using known platform-default locations
 - If none is found, the user is prompted to enter the path manually
 - The user is prompted for a local backup directory (default: `~/zen-backups` or
   `%USERPROFILE%\zen-backups`)
@@ -395,7 +391,7 @@ providers **So that** I can pick a provider without knowing the exact path
 - If Google Drive is detected, it appears as a numbered option
 - If OneDrive is detected, it appears as a numbered option
 - If Dropbox is detected, it appears as a numbered option
-- iCloud Drive appears as option on macOS only
+- Platform-specific provider availability is defined in platform feature files
 - A "Custom path" option is always available
 - A "None (local only)" option is always available
 
@@ -409,10 +405,7 @@ backups are scheduled without manual scheduler commands
 **Acceptance criteria:**
 
 - `zen-backup install` installs and enables both daily and weekly scheduled tasks
-- macOS launchd labels use `com.prometheas.zen-backup.daily` and `com.prometheas.zen-backup.weekly`
-- macOS: installs launchd plists to `~/Library/LaunchAgents/`
-- Linux: installs systemd user timers to `~/.config/systemd/user/`
-- Windows: creates Task Scheduler tasks in current user context
+- Scheduler integration uses platform-native facilities
 - Paths are substituted with actual values (no placeholders)
 
 ---

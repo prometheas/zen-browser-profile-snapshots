@@ -79,7 +79,7 @@ Feature: Install
 
   @windows
   Scenario: OneDrive detected on Windows
-    Given OneDrive is available at "%USERPROFILE%\OneDrive"
+    Given OneDrive is mounted at "%USERPROFILE%\OneDrive"
     When the install command is run
     Then "OneDrive" appears as a cloud sync option
 

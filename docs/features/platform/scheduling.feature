@@ -124,17 +124,21 @@ Feature: Scheduling
       | windows  |
 
   # Log output
-  Scenario Outline: Scheduled backup output is logged
+  Scenario Outline: Scheduled backup output is logged to backup.log
     Given the backup tool is installed on <platform>
     When a scheduled daily backup runs
     Then stdout and stderr are captured to "backup.log"
-    And on Linux the output is also available in the systemd journal
 
     Examples:
       | platform |
       | macos    |
       | linux    |
       | windows  |
+
+  Scenario: Scheduled backup output is available in the systemd journal
+    Given the backup tool is installed on linux
+    When a scheduled daily backup runs
+    Then on Linux the output is also available in the systemd journal
 
   # US-33: Scheduler Lifecycle Commands
   @macos
