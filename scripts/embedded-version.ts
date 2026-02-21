@@ -15,7 +15,7 @@ export async function withEmbeddedVersion<T>(version: string, fn: () => Promise<
 }
 
 export function renderEmbeddedVersionModule(version: string): string {
-  return `export const EMBEDDED_VERSION = ${JSON.stringify(version)};\n`;
+  return `export const EMBEDDED_VERSION: string = ${JSON.stringify(version)};\n`;
 }
 
 async function readCurrentModule(): Promise<string | null> {

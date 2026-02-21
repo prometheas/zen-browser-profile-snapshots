@@ -1,1 +1,1 @@
-export const EMBEDDED_VERSION = "dev";
+export const EMBEDDED_VERSION: string = "dev";
