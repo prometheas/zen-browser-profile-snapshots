@@ -2,7 +2,7 @@ import { Before, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { dirname } from "jsr:@std/path@1.1.4";
 import { loadConfig } from "../../../src/config.ts";
-import { expandPath } from "../../../src/core/path_utils.ts";
+import { expandPath } from "../../../src/core/path-utils.ts";
 import { runCli } from "../../../src/main.ts";
 import { ZenWorld } from "../support/world.ts";
 

@@ -1,7 +1,7 @@
-import "./m1_steps.ts";
-import "./backup_steps.ts";
-import "./list_steps.ts";
-import "./retention_steps.ts";
-import "./status_steps.ts";
-import "./restore_steps.ts";
-import "./platform_steps.ts";
+import "./m1-steps.ts";
+import "./backup-steps.ts";
+import "./list-steps.ts";
+import "./retention-steps.ts";
+import "./status-steps.ts";
+import "./restore-steps.ts";
+import "./platform-steps.ts";

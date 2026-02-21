@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
-import { expandPath } from "../../src/core/path_utils.ts";
+import { expandPath } from "../../src/core/path-utils.ts";
 import { loadConfig, resolveConfigPath } from "../../src/config.ts";
 
 Deno.test("resolveConfigPath uses env override", () => {

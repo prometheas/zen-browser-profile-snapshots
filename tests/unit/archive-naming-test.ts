@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1.0.19";
-import { buildArchiveName } from "../../src/core/archive_naming.ts";
+import { buildArchiveName } from "../../src/core/archive-naming.ts";
 
 Deno.test("buildArchiveName uses YYYY-MM-DD format", () => {
   const date = new Date("2026-01-15T08:10:00.000Z");
