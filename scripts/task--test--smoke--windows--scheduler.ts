@@ -48,22 +48,23 @@ if (import.meta.main) {
     console.log(formatPreflight(preflight));
 
     await run(["install"], env);
-    await assertStates(env, taskNames, "active", "install");
+    await assertNativeStates(env, taskNames, "active", "install");
 
     await run(["schedule", "stop"], env);
-    await assertStates(env, taskNames, "paused", "stop");
+    await assertNativeStates(env, taskNames, "paused", "stop");
 
     await run(["schedule", "start"], env);
-    await assertStates(env, taskNames, "active", "start");
+    await assertNativeStates(env, taskNames, "active", "start");
 
     await run(["uninstall"], env);
-    const finalSnapshot = await schedulerStates(env, taskNames);
-    if (finalSnapshot.states.size !== 0) {
+    const daily = await queryNativeTask(taskNames.daily, env);
+    const weekly = await queryNativeTask(taskNames.weekly, env);
+    if (daily.installed || weekly.installed) {
       throw new Error(
         [
           "Expected no scheduled jobs after uninstall.",
-          "Raw schedule status output:",
-          finalSnapshot.raw.trim(),
+          `daily installed: ${daily.installed}`,
+          `weekly installed: ${weekly.installed}`,
         ].join("\n"),
       );
     }
@@ -86,6 +87,34 @@ async function assertStates(
     () => schedulerStates(env, taskNames),
     taskNames,
     expected,
+    action,
+    8,
+    400,
+  );
+}
+
+async function assertNativeStates(
+  env: Record<string, string>,
+  taskNames: TaskNames,
+  expected: "active" | "paused",
+  action: string,
+): Promise<void> {
+  const expectedEnabled = expected === "active";
+  await waitForExpectedStates(
+    async () => {
+      const daily = await queryNativeTask(taskNames.daily, env);
+      const weekly = await queryNativeTask(taskNames.weekly, env);
+      const lines = [
+        `${taskNames.daily}: installed=${daily.installed} enabled=${daily.enabled}`,
+        `${taskNames.weekly}: installed=${weekly.installed} enabled=${weekly.enabled}`,
+      ];
+      const states = new Map<string, string>();
+      if (daily.installed) states.set(taskNames.daily, daily.enabled ? "active" : "paused");
+      if (weekly.installed) states.set(taskNames.weekly, weekly.enabled ? "active" : "paused");
+      return { states, raw: lines.join("\n") };
+    },
+    taskNames,
+    expectedEnabled ? "active" : "paused",
     action,
     8,
     400,
@@ -170,6 +199,30 @@ export async function waitForExpectedStates(
     }
   }
   throw lastError ?? new Error(`schedule ${action} failed`);
+}
+
+async function queryNativeTask(
+  taskName: string,
+  env: Record<string, string>,
+): Promise<{ installed: boolean; enabled: boolean }> {
+  const out = await new Deno.Command("schtasks", {
+    args: ["/Query", "/TN", taskName, "/XML"],
+    env,
+    stdout: "piped",
+    stderr: "null",
+  }).output().catch(() => undefined);
+  if (!out || !out.success) {
+    return { installed: false, enabled: false };
+  }
+  const xml = new TextDecoder().decode(out.stdout);
+  const enabledMatch = /<Enabled>\s*(true|false)\s*<\/Enabled>/i.exec(xml);
+  if (!enabledMatch) {
+    return { installed: true, enabled: true };
+  }
+  return {
+    installed: true,
+    enabled: enabledMatch[1].toLowerCase() === "true",
+  };
 }
 
 async function run(args: string[], env: Record<string, string>): Promise<string> {
