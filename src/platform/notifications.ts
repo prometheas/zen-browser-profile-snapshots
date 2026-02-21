@@ -31,11 +31,11 @@ export async function notify(options: NotifyOptions): Promise<void> {
 async function notifyMacos(options: NotifyOptions): Promise<string> {
   const hasTerminalNotifier = await executableExists("terminal-notifier", options.env);
   if (hasTerminalNotifier) {
-    const out = await new Deno.Command("terminal-notifier", {
-      args: ["-title", options.title, "-message", options.message],
-      stdout: "null",
-      stderr: "null",
-    }).output();
+    const out = await runCommandWithTimeout(
+      "terminal-notifier",
+      ["-title", options.title, "-message", options.message],
+      1500,
+    );
     if (out.success) return "terminal-notifier";
   }
 
@@ -46,11 +46,7 @@ async function notifyMacos(options: NotifyOptions): Promise<string> {
   const script = `display notification "${escapeAppleScript(options.message)}" with title "${
     escapeAppleScript(options.title)
   }"`;
-  const fallback = await new Deno.Command("osascript", {
-    args: ["-e", script],
-    stdout: "null",
-    stderr: "null",
-  }).output();
+  const fallback = await runCommandWithTimeout("osascript", ["-e", script], 1500);
   if (fallback.success) return "osascript";
 
   return hasTerminalNotifier ? "terminal-notifier-failed" : "osascript-failed";
@@ -104,4 +100,36 @@ async function appendNotificationWarning(backupRoot: string, warning: string): P
   const backupLogPath = join(backupRoot, "backup.log");
   const line = `[${new Date().toISOString()}] WARNING notifications unavailable: ${warning}\n`;
   await Deno.writeTextFile(backupLogPath, line, { append: true });
+}
+
+async function runCommandWithTimeout(
+  command: string,
+  args: string[],
+  timeoutMs: number,
+): Promise<{ success: boolean }> {
+  try {
+    const child = new Deno.Command(command, {
+      args,
+      stdout: "null",
+      stderr: "null",
+    }).spawn();
+    const statusPromise = child.status.then((status) => ({ success: status.success })).catch(
+      () => ({
+        success: false,
+      }),
+    );
+    const timeoutPromise = new Promise<{ success: boolean }>((resolve) => {
+      setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // ignore
+        }
+        resolve({ success: false });
+      }, timeoutMs);
+    });
+    return await Promise.race([statusPromise, timeoutPromise]);
+  } catch {
+    return { success: false };
+  }
 }

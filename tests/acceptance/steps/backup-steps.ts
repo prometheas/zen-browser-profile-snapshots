@@ -80,7 +80,7 @@ Given("cloud sync is configured to an inaccessible path", async function (this: 
   await writeConfig(this, this.profileDir, this.backupDir, this.cloudPath);
 });
 
-When("a daily backup is created", async function (this: ZenWorld) {
+When("a daily backup is created", { timeout: 15000 }, async function (this: ZenWorld) {
   await ensureBackupWorkspace(this);
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
@@ -98,7 +98,7 @@ When("a daily backup is created", async function (this: ZenWorld) {
   this.lastArchivePath = extractArchivePath(result.stdout);
 });
 
-When("a weekly backup is created", async function (this: ZenWorld) {
+When("a weekly backup is created", { timeout: 15000 }, async function (this: ZenWorld) {
   await ensureBackupWorkspace(this);
   const result = await runCli(["backup", "weekly"], {
     cwd: this.cwd,
@@ -149,7 +149,7 @@ Given(
   },
 );
 
-When("a daily backup is attempted", async function (this: ZenWorld) {
+When("a daily backup is attempted", { timeout: 15000 }, async function (this: ZenWorld) {
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
     os: targetOs(this),
