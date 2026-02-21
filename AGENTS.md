@@ -64,3 +64,9 @@ Story/spec boundary:
 - Do not use underscores or mixed/upper case in file/directory names.
 - Explicit filename exceptions: `AGENTS.md` and `README.md`.
 - If renaming paths for this rule, update all imports and file references in the same change.
+
+## Configuration Files
+
+- Store tool configuration files in `.config/` when the tool supports custom config paths.
+- Examples: `.config/.markdownlint.json`
+- This keeps the repository root clean and groups configuration in one place.
