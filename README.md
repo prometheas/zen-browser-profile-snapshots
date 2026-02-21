@@ -7,8 +7,9 @@ backup API rather than raw file copies.
 
 ## Status
 
-Current release status is macOS beta. Core CLI functionality is implemented with Deno and covered by
-unit, integration, and acceptance tests. Linux and Windows parity is planned for Milestone 2.
+Current release status is macOS beta, with Linux beta-in-progress. Core CLI functionality is
+implemented with Deno and covered by unit, integration, and acceptance tests. Windows parity is
+planned for Milestone 2 completion.
 
 ## Key Capabilities
 
@@ -126,6 +127,9 @@ Please include:
 - Build macOS release artifacts (binaries + checksums + release notes):
   - `deno task release:macos`
   - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:macos`
+- Build Linux release artifacts (binaries + checksums + release notes):
+  - `deno task release:linux`
+  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:linux`
 
 ## Docs
 
@@ -136,6 +140,7 @@ The specs are the source of truth:
 - `docs/product/user-stories.md`
 - `docs/features/`
 - `docs/releases/macos-beta-checklist.md`
+- `docs/releases/linux-beta-checklist.md`
 
 ## Contributing
 
