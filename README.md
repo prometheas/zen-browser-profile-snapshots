@@ -7,9 +7,8 @@ backup API rather than raw file copies.
 
 ## Status
 
-Core CLI functionality is implemented with Deno and covered by unit, integration, and acceptance
-tests. Current scope includes backup, list, status, restore, and macOS
-install/scheduling/notification flows.
+Current release status is macOS beta. Core CLI functionality is implemented with Deno and covered by
+unit, integration, and acceptance tests. Linux and Windows parity is planned for Milestone 2.
 
 ## Key Capabilities
 
@@ -52,27 +51,81 @@ Expected sections:
 Notes:
 
 - `uninstall` removes scheduler/config and leaves backups by default.
-- use `uninstall --purge-backups` to also remove backup archives.
+- Use `uninstall --purge-backups` to also remove backup archives.
 - macOS launchd labels use `com.prometheas.zen-backup.daily` and `com.prometheas.zen-backup.weekly`.
 
-## Packaging
+## Install (macOS Beta)
 
-- Build macOS binaries:
-  - `deno task build:macos`
-- Build macOS release artifacts (binaries + checksums + release notes):
-  - `deno task release:macos`
-  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:macos`
+Option A: Download release binaries from GitHub Releases:
 
-## macOS Beta Smoke Check
+1. Download:
 
-- Live scheduler smoke test (runs `schedule status/stop/start` against your real launchctl user
-  domain):
+- `zen-backup-aarch64-apple-darwin` for Apple Silicon
+- `zen-backup-x86_64-apple-darwin` for Intel
+
+1. Rename and mark executable:
+
+- `mv zen-backup-<target> zen-backup`
+- `chmod +x zen-backup`
+
+1. Place in your `PATH` (example):
+
+- `mv zen-backup ~/.local/bin/zen-backup`
+
+1. Verify:
+
+- `zen-backup status`
+
+Option B: Build from source (requires Deno 2):
+
+- `deno task build:macos`
+
+## First-Time Setup
+
+1. Install config + scheduler:
+
+- `zen-backup install`
+
+1. Verify scheduler:
+
+- `zen-backup schedule status`
+
+1. Run first backup:
+
+- `zen-backup backup daily`
+
+## Test Your Install
+
+- Command smoke:
+  - `zen-backup status`
+  - `zen-backup list`
+- Live scheduler smoke (macOS only):
   - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:macos:scheduler`
 
 Notes:
 
 - The smoke task is intentionally guarded and exits unless `ZEN_BACKUP_LIVE_SMOKE=1` is set.
 - If current scheduler jobs are paused before the test, they are left paused.
+
+## Feedback and Issues
+
+Report bugs and beta feedback in GitHub Issues:
+
+- https://github.com/prometheas/zen-browser-profile-snapshots/issues
+
+Please include:
+
+- macOS version and CPU architecture (Apple Silicon or Intel)
+- `zen-backup` version/tag used
+- exact command run
+- stdout/stderr output
+- relevant files from `~/zen-backups/backup.log` (if available)
+
+## Packaging (Maintainers)
+
+- Build macOS release artifacts (binaries + checksums + release notes):
+  - `deno task release:macos`
+  - Optional version override: `RELEASE_VERSION=vX.Y.Z deno task release:macos`
 
 ## Docs
 
@@ -83,19 +136,6 @@ The specs are the source of truth:
 - `docs/product/user-stories.md`
 - `docs/features/`
 - `docs/releases/macos-beta-checklist.md`
-
-## Planned Repo Layout
-
-When implementation begins, expected layout:
-
-- `src/`
-- `src/cli/`
-- `src/platform/macos/`
-- `src/platform/linux/`
-- `src/platform/windows/`
-- `src/sqlite/`
-- `resources/`
-- `tests/`
 
 ## Contributing
 
