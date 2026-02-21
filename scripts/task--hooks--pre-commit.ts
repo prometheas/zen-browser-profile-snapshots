@@ -41,7 +41,7 @@ checks.push(
     "run",
     "--allow-run",
     "--allow-read",
-    "scripts/lint--markdown.ts",
+    "scripts/task--lint--markdown.ts",
   ]),
 );
 if (!checks.at(-1)?.success) {

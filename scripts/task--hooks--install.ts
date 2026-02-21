@@ -1,8 +1,8 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write
 
 const hookContent = `#!/bin/sh
-# Installed by scripts/install-hooks.ts
-exec deno run --allow-run --allow-read scripts/hooks--pre-commit.ts
+# Installed by scripts/task--hooks--install.ts
+exec deno run --allow-run --allow-read scripts/task--hooks--pre-commit.ts
 `;
 
 const hookPath = ".git/hooks/pre-commit";

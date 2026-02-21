@@ -23,18 +23,18 @@
     "test": "deno task test:unit && deno task test:integration",
     "typecheck": "deno check src/main.ts tests/unit/**/*.ts tests/integration/**/*.ts tests/acceptance/**/*.ts",
     "lint": "deno lint src tests",
-    "lint:markdown": "deno run --allow-run --allow-read scripts/lint--markdown.ts",
+    "lint:markdown": "deno run --allow-run --allow-read scripts/task--lint--markdown.ts",
     "fmt": "deno fmt",
-    "hooks:install": "deno run --allow-read --allow-write scripts/install-hooks.ts",
-    "hooks:pre-commit": "deno run --allow-run --allow-read scripts/hooks--pre-commit.ts",
+    "hooks:install": "deno run --allow-read --allow-write scripts/task--hooks--install.ts",
+    "hooks:pre-commit": "deno run --allow-run --allow-read scripts/task--hooks--pre-commit.ts",
     "build:macos:arm64": "deno run -A scripts/build-target.ts aarch64-apple-darwin dist/zen-backup-aarch64-apple-darwin",
     "build:macos:x64": "deno run -A scripts/build-target.ts x86_64-apple-darwin dist/zen-backup-x86_64-apple-darwin",
     "build:macos": "deno task build:macos:arm64 && deno task build:macos:x64",
     "build:linux:x64": "deno run -A scripts/build-target.ts x86_64-unknown-linux-gnu dist/zen-backup-x86_64-unknown-linux-gnu",
     "build:linux:arm64": "deno run -A scripts/build-target.ts aarch64-unknown-linux-gnu dist/zen-backup-aarch64-unknown-linux-gnu",
     "build:linux": "deno task build:linux:x64 && deno task build:linux:arm64",
-    "release:macos": "deno run -A scripts/release-macos.ts",
-    "release:linux": "deno run -A scripts/release-linux.ts",
-    "test:smoke:macos:scheduler": "deno run -A scripts/smoke-macos-scheduler.ts"
+    "release:macos": "deno run -A scripts/task--release-macos.ts",
+    "release:linux": "deno run -A scripts/task--release-linux.ts",
+    "test:smoke:macos:scheduler": "deno run -A scripts/task--test--smoke--macos--scheduler.ts"
   }
 }

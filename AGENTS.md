@@ -77,6 +77,22 @@ Story/spec boundary:
 - Explicit filename exceptions: `AGENTS.md` and `README.md`.
 - If renaming paths for this rule, update all imports and file references in the same change.
 
+## Deno Task and Script Naming Rules
+
+- Keep `deno.json` task names in colon form (for example `test:unit`,
+  `test:acceptance:platform:macos`).
+- Keep complex task logic externalized in `scripts/` instead of long inline task commands.
+- Script filenames must stay `lower-kebab-case`; when a script maps to a colon task, replace `:`
+  with `--` in the script name.
+- Preferred mapping pattern:
+  - task: `test:acceptance:*`
+  - script: `scripts/task--test-acceptance.ts` (or another focused `scripts/task--<task-family>.ts`
+    wrapper)
+- When adding/changing tasks, update all references in the same change:
+  - `deno.json`
+  - CI workflows under `.github/workflows/`
+  - docs that show task commands (`README.md`, release checklists, etc.)
+
 ## Configuration Files
 
 - Store tool configuration files in `.config/` when the tool supports custom config paths.
