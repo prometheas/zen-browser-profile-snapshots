@@ -30,8 +30,8 @@ jobs:
         run: |
           deno task lint
           deno task typecheck
-          deno task test--unit
-          deno task test--integration
+          deno task test:unit
+          deno task test:integration
 
       - name: Linux acceptance (platform)
-        run: deno task test--acceptance--platform--linux
+        run: deno task test:acceptance:platform:linux

@@ -19,10 +19,10 @@ Run from repo root:
 
 - `deno task lint`
 - `deno task typecheck`
-- `deno task test--unit`
-- `deno task test--integration`
-- `deno task test--acceptance--platform--linux`
-- `deno task release--linux`
+- `deno task test:unit`
+- `deno task test:integration`
+- `deno task test:acceptance:platform:linux`
+- `deno task release:linux`
 
 ## CI Gate
 

@@ -49,14 +49,14 @@ jobs:
         run: |
           deno task lint
           deno task typecheck
-          deno task test--unit
-          deno task test--integration
-          deno task test--acceptance--m1
+          deno task test:unit
+          deno task test:integration
+          deno task test:acceptance:m1
 
       - name: Build macOS artifacts
         env:
           RELEASE_VERSION: ${{ needs.resolve-version.outputs.value }}
-        run: deno task release--macos
+        run: deno task release:macos
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -92,14 +92,14 @@ jobs:
         run: |
           deno task lint
           deno task typecheck
-          deno task test--unit
-          deno task test--integration
-          deno task test--acceptance--platform--linux
+          deno task test:unit
+          deno task test:integration
+          deno task test:acceptance:platform:linux
 
       - name: Build Linux artifacts
         env:
           RELEASE_VERSION: ${{ needs.resolve-version.outputs.value }}
-        run: deno task release--linux
+        run: deno task release:linux
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4

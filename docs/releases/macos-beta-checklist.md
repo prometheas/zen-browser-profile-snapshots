@@ -19,14 +19,14 @@ Run from repo root:
 
 - `deno task lint`
 - `deno task typecheck`
-- `deno task test--unit`
-- `deno task test--integration`
-- `deno task test--acceptance--platform--macos`
-- `deno task release--macos`
+- `deno task test:unit`
+- `deno task test:integration`
+- `deno task test:acceptance:platform:macos`
+- `deno task release:macos`
 
 Optional live smoke on a macOS host:
 
-- `ZEN_BACKUP_LIVE_SMOKE=1 deno task test--smoke--macos--scheduler`
+- `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:macos:scheduler`
 
 ## Manual QA
 

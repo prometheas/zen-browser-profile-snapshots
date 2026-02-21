@@ -50,7 +50,7 @@ if (!checks.at(-1)?.success) {
 }
 
 // 4. Unit tests
-checks.push(await runCheck("Running unit tests", ["task", "test--unit"]));
+checks.push(await runCheck("Running unit tests", ["task", "test:unit"]));
 if (!checks.at(-1)?.success) {
   console.error("\n✗ Unit tests failed.");
   Deno.exit(1);

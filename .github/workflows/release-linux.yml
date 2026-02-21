@@ -32,9 +32,9 @@ jobs:
         run: |
           deno task lint
           deno task typecheck
-          deno task test--unit
-          deno task test--integration
-          deno task test--acceptance--platform--linux
+          deno task test:unit
+          deno task test:integration
+          deno task test:acceptance:platform:linux
 
       - name: Resolve release version
         id: version
@@ -50,7 +50,7 @@ jobs:
       - name: Build release artifacts
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
-        run: deno task release--linux
+        run: deno task release:linux
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
