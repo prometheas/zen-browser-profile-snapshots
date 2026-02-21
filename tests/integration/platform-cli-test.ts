@@ -60,6 +60,28 @@ Deno.test("install writes config and Linux systemd user units", async () => {
   assertEquals(await exists(weeklyTimer), true);
 });
 
+Deno.test("install writes config and Windows Task Scheduler metadata", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const appData = join(tempDir, "AppData", "Roaming");
+  const profilePath = join(appData, "zen", "Profiles", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+
+  const result = await runCli(["install"], {
+    cwd: tempDir,
+    os: "windows",
+    env: { HOME: tempDir },
+  });
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stdout, "Detected profile path");
+
+  const configPath = join(appData, "zen-profile-backup", "settings.toml");
+  const dailyTask = join(appData, "zen-profile-backup", "task-scheduler", "ZenBackupDaily.json");
+  const weeklyTask = join(appData, "zen-profile-backup", "task-scheduler", "ZenBackupWeekly.json");
+  assertEquals(await exists(configPath), true);
+  assertEquals(await exists(dailyTask), true);
+  assertEquals(await exists(weeklyTask), true);
+});
+
 Deno.test("install uses process HOME when runtime env is not overridden", async () => {
   const tempHome = await Deno.makeTempDir();
   const profilePath = join(
@@ -313,6 +335,90 @@ Deno.test("linux uninstall removes timers and settings, and preserves backups by
   assertEquals(await exists(configPath), false);
   assertEquals(await exists(dailyTimer), false);
   assertEquals(await exists(weeklyTimer), false);
+  assertEquals(
+    await exists(join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz")),
+    true,
+  );
+});
+
+Deno.test("windows schedule start/stop/status and aliases work", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const profilePath = join(tempDir, "AppData", "Roaming", "zen", "Profiles", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+  await runCli(["install"], { cwd: tempDir, os: "windows", env: { HOME: tempDir } });
+
+  const stop = await runCli(["schedule", "stop"], {
+    cwd: tempDir,
+    os: "windows",
+    env: { HOME: tempDir },
+  });
+  assertEquals(stop.exitCode, 0);
+  assertStringIncludes(stop.stdout, "stopped");
+  assertStringIncludes(stop.stdout, "ZenBackupDaily: paused");
+  assertStringIncludes(stop.stdout, "ZenBackupWeekly: paused");
+
+  const resume = await runCli(["schedule", "resume"], {
+    cwd: tempDir,
+    os: "windows",
+    env: { HOME: tempDir },
+  });
+  assertEquals(resume.exitCode, 0);
+  assertStringIncludes(resume.stdout, "started");
+  assertStringIncludes(resume.stdout, "ZenBackupDaily: active");
+  assertStringIncludes(resume.stdout, "ZenBackupWeekly: active");
+
+  const pauseAlias = await runCli(["schedule", "pause"], {
+    cwd: tempDir,
+    os: "windows",
+    env: { HOME: tempDir },
+  });
+  assertEquals(pauseAlias.exitCode, 0);
+  assertStringIncludes(pauseAlias.stdout, "paused");
+
+  const startAlias = await runCli(["schedule", "start"], {
+    cwd: tempDir,
+    os: "windows",
+    env: { HOME: tempDir },
+  });
+  assertEquals(startAlias.exitCode, 0);
+  assertStringIncludes(startAlias.stdout, "active");
+
+  const status = await runCli(["schedule", "status"], {
+    cwd: tempDir,
+    os: "windows",
+    env: { HOME: tempDir },
+  });
+  assertEquals(status.exitCode, 0);
+  assertStringIncludes(status.stdout, "ZenBackupDaily");
+  assertStringIncludes(status.stdout, "ZenBackupWeekly");
+});
+
+Deno.test("windows uninstall removes tasks and settings, and preserves backups by default", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const profilePath = join(tempDir, "AppData", "Roaming", "zen", "Profiles", "default");
+  await Deno.mkdir(profilePath, { recursive: true });
+  await runCli(["install"], { cwd: tempDir, os: "windows", env: { HOME: tempDir } });
+  await Deno.mkdir(join(tempDir, "zen-backups", "daily"), { recursive: true });
+  await Deno.writeTextFile(
+    join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz"),
+    "x",
+  );
+
+  const result = await runCli(["uninstall"], {
+    cwd: tempDir,
+    os: "windows",
+    env: { HOME: tempDir },
+  });
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stderr, "--purge-backups");
+
+  const appData = join(tempDir, "AppData", "Roaming");
+  const configPath = join(appData, "zen-profile-backup", "settings.toml");
+  const dailyTask = join(appData, "zen-profile-backup", "task-scheduler", "ZenBackupDaily.json");
+  const weeklyTask = join(appData, "zen-profile-backup", "task-scheduler", "ZenBackupWeekly.json");
+  assertEquals(await exists(configPath), false);
+  assertEquals(await exists(dailyTask), false);
+  assertEquals(await exists(weeklyTask), false);
   assertEquals(
     await exists(join(tempDir, "zen-backups", "daily", "zen-backup-daily-2026-01-15.tar.gz")),
     true,

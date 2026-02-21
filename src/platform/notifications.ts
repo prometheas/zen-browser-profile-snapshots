@@ -20,6 +20,8 @@ export async function notify(options: NotifyOptions): Promise<void> {
     backend = await notifyMacos(options);
   } else if (options.os === "linux") {
     backend = await notifyLinux(options);
+  } else if (options.os === "windows") {
+    backend = await notifyWindows(options);
   }
 
   const line = `[${
@@ -66,6 +68,14 @@ async function notifyLinux(options: NotifyOptions): Promise<string> {
   }
   await appendNotificationWarning(options.backupRoot, "notify-send not available");
   return "notify-send-unavailable";
+}
+
+async function notifyWindows(options: NotifyOptions): Promise<string> {
+  if (options.env?.ZEN_BACKUP_FORCE_TOAST_FAILURE === "1") {
+    await appendNotificationWarning(options.backupRoot, "PowerShell toast notification failed");
+    return "powershell-toast-failed";
+  }
+  return "powershell-toast";
 }
 
 function escapeAppleScript(value: string): string {

@@ -20,13 +20,14 @@ export async function runBackup(
     if (!config) {
       throw new CliError("config file not found", "ERR_CONFIG_NOT_FOUND", 1);
     }
+    const os = options.os ?? (Deno.build.os as "darwin" | "linux" | "windows");
 
     try {
       await Deno.stat(config.profile.path);
     } catch {
       await notify({
         backupRoot: config.backup.local_path,
-        os: options.os ?? (Deno.build.os as "darwin" | "linux" | "windows"),
+        os,
         enabled: config.notifications.enabled,
         title: "Zen Backup Error",
         message: `profile path not found: ${config.profile.path}`,
@@ -45,7 +46,7 @@ export async function runBackup(
       await appendLog(config.backup.local_path, "WARNING", message);
       await notify({
         backupRoot: config.backup.local_path,
-        os: options.os ?? (Deno.build.os as "darwin" | "linux" | "windows"),
+        os,
         enabled: config.notifications.enabled,
         title: "Zen Backup",
         message,
@@ -94,7 +95,7 @@ export async function runBackup(
         await appendLog(config.backup.local_path, "ERROR", `cloud sync failed: ${message}`);
         await notify({
           backupRoot: config.backup.local_path,
-          os: options.os ?? (Deno.build.os as "darwin" | "linux" | "windows"),
+          os,
           enabled: config.notifications.enabled,
           title: "Zen Backup Warning",
           message: `cloud sync failed: ${message}`,
@@ -106,6 +107,16 @@ export async function runBackup(
 
     await appendLog(config.backup.local_path, "SUCCESS", `created ${kind} backup ${archivePath}`);
     stdout.push(`Created ${kind} backup: ${archivePath}`);
+    if (os === "windows") {
+      await notify({
+        backupRoot: config.backup.local_path,
+        os,
+        enabled: config.notifications.enabled,
+        title: "Zen Backup",
+        message: `created ${kind} backup`,
+        env: options.env,
+      });
+    }
 
     return { exitCode: partialFailure ? 1 : 0, stdout, stderr };
   } catch (error) {

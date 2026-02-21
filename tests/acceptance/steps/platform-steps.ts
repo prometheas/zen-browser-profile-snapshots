@@ -87,6 +87,10 @@ Given("notify-send is not installed", function (this: ZenWorld) {
   this.env.ZEN_BACKUP_FORCE_NO_NOTIFY_SEND = "1";
 });
 
+Given("PowerShell toast notification fails", function (this: ZenWorld) {
+  this.env.ZEN_BACKUP_FORCE_TOAST_FAILURE = "1";
+});
+
 Given("the launchd agent {string} is loaded", async function (this: ZenWorld, _label: string) {
   await ensurePlatformConfig(this);
   const agentsDir = join(this.cwd, "Library", "LaunchAgents");
@@ -153,6 +157,41 @@ Given("no launchd agents are loaded", async function (this: ZenWorld) {
     undefined
   );
   await Deno.remove(join(agentsDir, ".zen-backup-loaded")).catch(() => undefined);
+});
+
+Given("the scheduled task {string} exists", async function (this: ZenWorld, label: string) {
+  await ensurePlatformConfig(this);
+  await ensureWindowsTask(
+    this,
+    label,
+    label === "ZenBackupDaily"
+      ? { dailyTime: "12:30", weeklyDay: null, weeklyTime: null }
+      : { dailyTime: null, weeklyDay: "Sunday", weeklyTime: "02:00" },
+  );
+});
+
+Given("the scheduled tasks exist", async function (this: ZenWorld) {
+  await ensurePlatformConfig(this);
+  await ensureWindowsTask(this, "ZenBackupDaily", {
+    dailyTime: "12:30",
+    weeklyDay: null,
+    weeklyTime: null,
+  });
+  await ensureWindowsTask(this, "ZenBackupWeekly", {
+    dailyTime: null,
+    weeklyDay: "Sunday",
+    weeklyTime: "02:00",
+  });
+});
+
+Given("no scheduled tasks exist", async function (this: ZenWorld) {
+  await ensurePlatformConfig(this);
+  const schedulerDir = windowsSchedulerDir(this);
+  await Deno.remove(join(schedulerDir, "ZenBackupDaily.json")).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, "ZenBackupWeekly.json")).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, ".disabled-ZenBackupDaily")).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, ".disabled-ZenBackupWeekly")).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, ".zen-backup-loaded")).catch(() => undefined);
 });
 
 Given(
@@ -394,6 +433,46 @@ Then("a launchd agent {string} is loaded", function (this: ZenWorld, label: stri
   assertStringIncludes(this.stdout, normalizeLegacyName(label).replace(".plist", ""));
 });
 
+Then("scheduled task {string} exists", async function (this: ZenWorld, label: string) {
+  assertEquals(await exists(join(windowsSchedulerDir(this), `${label}.json`)), true);
+});
+
+Then("scheduled task {string} is removed", async function (this: ZenWorld, label: string) {
+  assertEquals(await exists(join(windowsSchedulerDir(this), `${label}.json`)), false);
+});
+
+Then("a scheduled task {string} exists", function (this: ZenWorld, label: string) {
+  assertStringIncludes(this.stdout, label);
+});
+
+Then("the tasks run in the current user context", async function (this: ZenWorld) {
+  const daily = await readWindowsTask(this, "ZenBackupDaily");
+  const weekly = await readWindowsTask(this, "ZenBackupWeekly");
+  assertEquals(daily.userContext, "current-user");
+  assertEquals(weekly.userContext, "current-user");
+});
+
+Then(
+  "the task is configured to run at the configured daily_time \\(default: {int}:{int})",
+  async function (this: ZenWorld, hour: number, minute: number) {
+    const task = await readWindowsTask(this, "ZenBackupDaily");
+    const hh = String(hour).padStart(2, "0");
+    const mm = String(minute).padStart(2, "0");
+    assertEquals(task.schedule?.dailyTime, `${hh}:${mm}`);
+  },
+);
+
+Then(
+  "the task is configured to run at the configured weekly_day and weekly_time \\(default: Sunday {int}:{int})",
+  async function (this: ZenWorld, hour: number, minute: number) {
+    const task = await readWindowsTask(this, "ZenBackupWeekly");
+    const hh = String(hour).padStart(2, "0");
+    const mm = String(minute).padStart(2, "0");
+    assertEquals(task.schedule?.weeklyDay, "Sunday");
+    assertEquals(task.schedule?.weeklyTime, `${hh}:${mm}`);
+  },
+);
+
 Then("a systemd user timer {string} is active", function (this: ZenWorld, timer: string) {
   assertStringIncludes(this.stdout, timer);
 });
@@ -586,7 +665,7 @@ function expandKnownPath(world: ZenWorld, raw: string): string {
   return raw.replace("~", world.cwd).replace("%USERPROFILE%", world.cwd).replace(
     "%APPDATA%",
     join(world.cwd, "AppData", "Roaming"),
-  );
+  ).replaceAll("\\", "/");
 }
 
 async function readNotifications(world: ZenWorld): Promise<string> {
@@ -630,4 +709,41 @@ function targetOs(world: ZenWorld): Platform {
   const raw = world.env.ZEN_BACKUP_TEST_OS;
   if (raw === "linux" || raw === "windows" || raw === "darwin") return raw;
   return "darwin";
+}
+
+function windowsSchedulerDir(world: ZenWorld): string {
+  return join(world.cwd, "AppData", "Roaming", "zen-profile-backup", "task-scheduler");
+}
+
+async function ensureWindowsTask(
+  world: ZenWorld,
+  name: string,
+  schedule: {
+    dailyTime: string | null;
+    weeklyDay: string | null;
+    weeklyTime: string | null;
+  },
+): Promise<void> {
+  const schedulerDir = windowsSchedulerDir(world);
+  await Deno.mkdir(schedulerDir, { recursive: true });
+  const payload = {
+    name,
+    command: name === "ZenBackupDaily" ? "zen-backup backup daily" : "zen-backup backup weekly",
+    userContext: "current-user",
+    schedule,
+  };
+  await Deno.writeTextFile(join(schedulerDir, `${name}.json`), JSON.stringify(payload, null, 2));
+  await Deno.writeTextFile(join(schedulerDir, ".zen-backup-loaded"), "1");
+}
+
+async function readWindowsTask(
+  world: ZenWorld,
+  name: string,
+): Promise<{
+  userContext: string;
+  schedule?: { dailyTime?: string | null; weeklyDay?: string | null; weeklyTime?: string | null };
+}> {
+  const taskPath = join(windowsSchedulerDir(world), `${name}.json`);
+  const raw = await Deno.readTextFile(taskPath);
+  return JSON.parse(raw);
 }

@@ -11,6 +11,8 @@ export const DAILY_LABEL = "com.prometheas.zen-backup.daily";
 export const WEEKLY_LABEL = "com.prometheas.zen-backup.weekly";
 export const DAILY_TIMER = "zen-backup-daily.timer";
 export const WEEKLY_TIMER = "zen-backup-weekly.timer";
+export const DAILY_TASK = "ZenBackupDaily";
+export const WEEKLY_TASK = "ZenBackupWeekly";
 
 export async function installScheduler(
   config: AppConfig,
@@ -23,6 +25,9 @@ export async function installScheduler(
   if (os === "linux") {
     return await installSystemd(config, options);
   }
+  if (os === "windows") {
+    return await installWindows(config, options);
+  }
   return { installed: false, labels: [], states: {} };
 }
 
@@ -34,12 +39,16 @@ export async function uninstallScheduler(options: RuntimeOptions = {}): Promise<
   if (os === "linux") {
     return await uninstallSystemd(options);
   }
+  if (os === "windows") {
+    return await uninstallWindows(options);
+  }
   return { installed: false, labels: [], states: {} };
 }
 
 export async function startScheduler(options: RuntimeOptions = {}): Promise<SchedulerStatus> {
   const os = options.os ?? (Deno.build.os as Platform);
   if (os === "linux") return await startSystemd(options);
+  if (os === "windows") return await startWindows(options);
   if (os !== "darwin") return { installed: false, labels: [], states: {} };
 
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
@@ -63,6 +72,7 @@ export async function startScheduler(options: RuntimeOptions = {}): Promise<Sche
 export async function stopScheduler(options: RuntimeOptions = {}): Promise<SchedulerStatus> {
   const os = options.os ?? (Deno.build.os as Platform);
   if (os === "linux") return await stopSystemd(options);
+  if (os === "windows") return await stopWindows(options);
   if (os !== "darwin") return { installed: false, labels: [], states: {} };
 
   const agentsDir = join(resolveHome(options), "Library", "LaunchAgents");
@@ -90,6 +100,9 @@ export async function queryScheduler(options: RuntimeOptions = {}): Promise<Sche
   }
   if (os === "linux") {
     return await querySystemd(options);
+  }
+  if (os === "windows") {
+    return await queryWindows(options);
   }
   return { installed: false, labels: [], states: {} };
 }
@@ -360,9 +373,133 @@ async function querySystemd(options: RuntimeOptions): Promise<SchedulerStatus> {
   };
 }
 
+async function installWindows(
+  config: AppConfig,
+  options: RuntimeOptions,
+): Promise<SchedulerStatus> {
+  const schedulerDir = resolveWindowsSchedulerDir(options);
+  await Deno.mkdir(schedulerDir, { recursive: true });
+
+  await writeWindowsTask(schedulerDir, DAILY_TASK, {
+    kind: "daily",
+    dailyTime: config.schedule.daily_time,
+    weeklyDay: undefined,
+    weeklyTime: undefined,
+  });
+  await writeWindowsTask(schedulerDir, WEEKLY_TASK, {
+    kind: "weekly",
+    dailyTime: undefined,
+    weeklyDay: config.schedule.weekly_day,
+    weeklyTime: config.schedule.weekly_time,
+  });
+
+  await Deno.remove(join(schedulerDir, `.disabled-${DAILY_TASK}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${WEEKLY_TASK}`)).catch(() => undefined);
+  await Deno.writeTextFile(join(schedulerDir, ".zen-backup-loaded"), "1");
+
+  return await queryWindows(options);
+}
+
+async function uninstallWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const schedulerDir = resolveWindowsSchedulerDir(options);
+  await Deno.remove(join(schedulerDir, ".zen-backup-loaded")).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `${DAILY_TASK}.json`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `${WEEKLY_TASK}.json`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${DAILY_TASK}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${WEEKLY_TASK}`)).catch(() => undefined);
+
+  return {
+    installed: false,
+    labels: [],
+    states: {
+      [DAILY_TASK]: "not_installed",
+      [WEEKLY_TASK]: "not_installed",
+    },
+  };
+}
+
+async function startWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const schedulerDir = resolveWindowsSchedulerDir(options);
+  const dailyTaskPath = join(schedulerDir, `${DAILY_TASK}.json`);
+  const weeklyTaskPath = join(schedulerDir, `${WEEKLY_TASK}.json`);
+  const hasTasks = await exists(dailyTaskPath) && await exists(weeklyTaskPath);
+  if (!hasTasks) return await queryWindows(options);
+
+  await Deno.remove(join(schedulerDir, `.disabled-${DAILY_TASK}`)).catch(() => undefined);
+  await Deno.remove(join(schedulerDir, `.disabled-${WEEKLY_TASK}`)).catch(() => undefined);
+  await Deno.writeTextFile(join(schedulerDir, ".zen-backup-loaded"), "1");
+  return await queryWindows(options);
+}
+
+async function stopWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const schedulerDir = resolveWindowsSchedulerDir(options);
+  const dailyTaskPath = join(schedulerDir, `${DAILY_TASK}.json`);
+  const weeklyTaskPath = join(schedulerDir, `${WEEKLY_TASK}.json`);
+  const hasTasks = await exists(dailyTaskPath) && await exists(weeklyTaskPath);
+  if (!hasTasks) return await queryWindows(options);
+
+  await Deno.writeTextFile(join(schedulerDir, `.disabled-${DAILY_TASK}`), "1");
+  await Deno.writeTextFile(join(schedulerDir, `.disabled-${WEEKLY_TASK}`), "1");
+  await Deno.writeTextFile(join(schedulerDir, ".zen-backup-loaded"), "1");
+  return await queryWindows(options);
+}
+
+async function queryWindows(options: RuntimeOptions): Promise<SchedulerStatus> {
+  const schedulerDir = resolveWindowsSchedulerDir(options);
+  const dailyTaskPath = join(schedulerDir, `${DAILY_TASK}.json`);
+  const weeklyTaskPath = join(schedulerDir, `${WEEKLY_TASK}.json`);
+  const dailyInstalled = await exists(dailyTaskPath);
+  const weeklyInstalled = await exists(weeklyTaskPath);
+  const markerLoaded = await exists(join(schedulerDir, ".zen-backup-loaded"));
+  const dailyPaused = await exists(join(schedulerDir, `.disabled-${DAILY_TASK}`));
+  const weeklyPaused = await exists(join(schedulerDir, `.disabled-${WEEKLY_TASK}`));
+  const states: Record<string, "active" | "paused" | "not_installed"> = {};
+  states[DAILY_TASK] = resolveState(dailyInstalled, dailyPaused, markerLoaded && dailyInstalled);
+  states[WEEKLY_TASK] = resolveState(
+    weeklyInstalled,
+    weeklyPaused,
+    markerLoaded && weeklyInstalled,
+  );
+
+  return {
+    installed: dailyInstalled && weeklyInstalled,
+    labels: dailyInstalled || weeklyInstalled ? [DAILY_TASK, WEEKLY_TASK] : [],
+    states,
+  };
+}
+
 function resolveHome(options: RuntimeOptions): string {
   const env = options.env ?? Deno.env.toObject();
   return env.HOME ?? env.USERPROFILE ?? Deno.cwd();
+}
+
+function resolveWindowsSchedulerDir(options: RuntimeOptions): string {
+  const env = options.env ?? Deno.env.toObject();
+  const appData = env.APPDATA ?? join(resolveHome(options), "AppData", "Roaming");
+  return join(appData, "zen-profile-backup", "task-scheduler");
+}
+
+async function writeWindowsTask(
+  schedulerDir: string,
+  name: string,
+  schedule: {
+    kind: "daily" | "weekly";
+    dailyTime?: string;
+    weeklyDay?: string;
+    weeklyTime?: string;
+  },
+): Promise<void> {
+  const payload = {
+    name,
+    command: `zen-backup backup ${schedule.kind}`,
+    userContext: "current-user",
+    schedule: {
+      dailyTime: schedule.dailyTime ?? null,
+      weeklyDay: schedule.weeklyDay ?? null,
+      weeklyTime: schedule.weeklyTime ?? null,
+    },
+  };
+  await Deno.writeTextFile(join(schedulerDir, `${name}.json`), JSON.stringify(payload, null, 2));
 }
 
 async function shouldUseRealLaunchctl(options: RuntimeOptions): Promise<boolean> {
