@@ -50,12 +50,14 @@ Represents a complete Zen browser profile with all supported data types for comp
 ## Explicitly Excluded
 
 These files are NOT included (security/privacy):
+
 - `cookies.sqlite` — Session tokens, authentication data
 - `key4.db` — Encryption keys
 - `logins.json` — Saved passwords
 - `cert9.db` — Certificate database
 
 These files are NOT included (rebuildable):
+
 - `cache2/` — Browser cache
 - `storage/temporary/` — Temporary storage
 - `crashes/`, `minidumps/` — Crash reports
@@ -64,20 +66,24 @@ These files are NOT included (rebuildable):
 ## SQLite Schema Requirements
 
 ### places.sqlite
+
 - `moz_places` — URL storage
 - `moz_bookmarks` — Bookmark tree with parent relationships
 - `moz_historyvisits` — Visit timestamps with frecency data
 - `moz_origins` — Origin aggregation
 
 ### formhistory.sqlite
+
 - `moz_formhistory` — Field name/value pairs with use count
 
 ### permissions.sqlite
+
 - `moz_perms` — Permission grants (origin, type, permission)
 
 ## Validation
 
 After restore, verify:
+
 1. All `.sqlite` files pass `PRAGMA integrity_check`
 2. All `.sqlite` files contain expected tables
 3. All `.json` files are valid JSON

@@ -111,7 +111,7 @@ Notes:
 
 Report bugs and beta feedback in GitHub Issues:
 
-- https://github.com/prometheas/zen-browser-profile-snapshots/issues
+- <https://github.com/prometheas/zen-browser-profile-snapshots/issues>
 
 Please include:
 
