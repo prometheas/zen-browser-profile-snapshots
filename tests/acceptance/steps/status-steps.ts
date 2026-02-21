@@ -1,6 +1,7 @@
 import { DataTable, Given, Then } from "npm:@cucumber/cucumber@12.6.0";
 import { assert } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../../src/core/toml-string.ts";
 import { runCli } from "../../../src/main.ts";
 import type { Platform } from "../../../src/types.ts";
 import { ZenWorld } from "../support/world.ts";
@@ -225,7 +226,7 @@ async function writeConfig(world: ZenWorld): Promise<void> {
   const configPath = world.resolvePath("custom/settings.toml");
   world.env.ZEN_BACKUP_CONFIG = "custom/settings.toml";
   await Deno.mkdir(dirname(configPath), { recursive: true });
-  const cloudLine = world.cloudPath ? `cloud_path = "${world.cloudPath}"\n` : "";
+  const cloudLine = world.cloudPath ? `cloud_path = ${toTomlStringLiteral(world.cloudPath)}\n` : "";
   const daily = world.retentionDaily;
   const weekly = world.retentionWeekly;
   const retention = daily === undefined && weekly === undefined
@@ -235,7 +236,9 @@ async function writeConfig(world: ZenWorld): Promise<void> {
     }`;
   await Deno.writeTextFile(
     configPath,
-    `[profile]\npath = "${world.profileDir}"\n\n[backup]\nlocal_path = "${world.backupDir}"\n${cloudLine}${retention}`,
+    `[profile]\npath = ${toTomlStringLiteral(world.profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(world.backupDir)
+    }\n${cloudLine}${retention}`,
   );
 }
 

@@ -2,6 +2,7 @@ import { After, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
 import { assert, assertEquals, assertMatch, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { DataTable } from "npm:@cucumber/cucumber@12.6.0";
 import { dirname, join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../../src/core/toml-string.ts";
 import { runCli } from "../../../src/main.ts";
 import type { Platform } from "../../../src/types.ts";
 import { ZenWorld } from "../support/world.ts";
@@ -314,10 +315,12 @@ async function writeConfig(
 ): Promise<void> {
   const configPath = world.resolvePath("custom/settings.toml");
   await Deno.mkdir(dirname(configPath), { recursive: true });
-  const cloudLine = cloudPath ? `cloud_path = "${cloudPath}"\n` : "";
+  const cloudLine = cloudPath ? `cloud_path = ${toTomlStringLiteral(cloudPath)}\n` : "";
   await Deno.writeTextFile(
     configPath,
-    `[profile]\npath = "${profilePath}"\n\n[backup]\nlocal_path = "${backupPath}"\n${cloudLine}`,
+    `[profile]\npath = ${toTomlStringLiteral(profilePath)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupPath)
+    }\n${cloudLine}`,
   );
 }
 

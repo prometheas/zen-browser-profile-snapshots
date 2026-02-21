@@ -1,6 +1,7 @@
 import { Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../../src/core/toml-string.ts";
 import { runCli } from "../../../src/main.ts";
 import type { Platform } from "../../../src/types.ts";
 import { ZenWorld } from "../support/world.ts";
@@ -192,7 +193,9 @@ Given(
     await createSqliteDb(join(profileDir, "places.sqlite"));
     await Deno.writeTextFile(
       join(this.cwd, "custom-settings.toml"),
-      `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n\n[notifications]\nenabled = false\n`,
+      `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+        toTomlStringLiteral(backupDir)
+      }\n\n[notifications]\nenabled = false\n`,
     );
     this.env.ZEN_BACKUP_CONFIG = "custom-settings.toml";
   },
@@ -247,7 +250,9 @@ When("the scheduled time 12:30 is reached", async function (this: ZenWorld) {
   await Deno.mkdir(join(this.cwd, "custom"), { recursive: true });
   await Deno.writeTextFile(
     join(this.cwd, "custom", "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupDir)
+    }\n`,
   );
   const result = await runCli(["backup", "daily"], {
     cwd: this.cwd,
@@ -644,7 +649,9 @@ async function ensurePlatformConfig(world: ZenWorld): Promise<void> {
   await Deno.mkdir(join(world.cwd, "custom"), { recursive: true });
   await Deno.writeTextFile(
     join(world.cwd, "custom", "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupDir)
+    }\n`,
   );
   world.env.ZEN_BACKUP_CONFIG = "custom/settings.toml";
 }

@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertMatch, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../src/core/toml-string.ts";
 import { runCli } from "../../src/main.ts";
 
 Deno.test("backup daily creates tar.gz in daily subdirectory", async () => {
@@ -186,9 +187,11 @@ Deno.test("backup errors when profile path does not exist and no archive is crea
   await Deno.mkdir(configDir, { recursive: true });
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${
-      join(tempDir, "missing-profile")
-    }"\n\n[backup]\nlocal_path = "${backupDir}"\n\n[notifications]\nenabled = false\n`,
+    `[profile]\npath = ${
+      toTomlStringLiteral(join(tempDir, "missing-profile"))
+    }\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupDir)
+    }\n\n[notifications]\nenabled = false\n`,
   );
 
   const result = await runCli(["backup", "daily"], {
@@ -368,11 +371,15 @@ async function createWorkspace(
   await Deno.mkdir(profileDir, { recursive: true });
   await Deno.mkdir(configDir, { recursive: true });
 
-  const cloudLine = options.cloudPath ? `cloud_path = "${options.cloudPath}"\n` : "";
+  const cloudLine = options.cloudPath
+    ? `cloud_path = ${toTomlStringLiteral(options.cloudPath)}\n`
+    : "";
   const retention = options.retention ?? { daily_days: 30, weekly_days: 84 };
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n${cloudLine}\n[retention]\ndaily_days = ${retention.daily_days}\nweekly_days = ${retention.weekly_days}\n\n[notifications]\nenabled = false\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupDir)
+    }\n${cloudLine}\n[retention]\ndaily_days = ${retention.daily_days}\nweekly_days = ${retention.weekly_days}\n\n[notifications]\nenabled = false\n`,
   );
 
   return { tempDir, profileDir, backupDir };

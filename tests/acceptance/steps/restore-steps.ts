@@ -1,6 +1,7 @@
 import { DataTable, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../../src/core/toml-string.ts";
 import { runCli } from "../../../src/main.ts";
 import { ZenWorld } from "../support/world.ts";
 
@@ -239,7 +240,9 @@ async function ensureRestoreWorkspace(world: ZenWorld): Promise<void> {
   await Deno.mkdir(world.resolvePath("custom"), { recursive: true });
   await Deno.writeTextFile(
     world.resolvePath("custom/settings.toml"),
-    `[profile]\npath = "${world.profileDir}"\n\n[backup]\nlocal_path = "${world.backupDir}"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(world.profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(world.backupDir)
+    }\n`,
   );
 }
 

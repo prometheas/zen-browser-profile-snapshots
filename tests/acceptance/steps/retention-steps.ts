@@ -1,6 +1,7 @@
 import { DataTable, Given, Then } from "npm:@cucumber/cucumber@12.6.0";
 import { assertEquals } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../../src/core/toml-string.ts";
 import { ZenWorld } from "../support/world.ts";
 
 Given("the configuration has {string}", async function (this: ZenWorld, setting: string) {
@@ -156,10 +157,12 @@ async function writeConfig(world: ZenWorld): Promise<void> {
     : `\n[retention]\n${daily === undefined ? "" : `daily_days = ${daily}\n`}${
       weekly === undefined ? "" : `weekly_days = ${weekly}\n`
     }`;
-  const cloudLine = world.cloudPath ? `cloud_path = "${world.cloudPath}"\n` : "";
+  const cloudLine = world.cloudPath ? `cloud_path = ${toTomlStringLiteral(world.cloudPath)}\n` : "";
   await Deno.writeTextFile(
     configPath,
-    `[profile]\npath = "${world.profileDir}"\n\n[backup]\nlocal_path = "${world.backupDir}"\n${cloudLine}${retention}`,
+    `[profile]\npath = ${toTomlStringLiteral(world.profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(world.backupDir)
+    }\n${cloudLine}${retention}`,
   );
 }
 

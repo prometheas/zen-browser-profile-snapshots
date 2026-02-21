@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../src/core/toml-string.ts";
 import { runCli } from "../../src/main.ts";
 
 Deno.test("list shows daily and weekly archives in chronological order", async () => {
@@ -46,9 +47,9 @@ Deno.test("list errors when backup directory is missing", async () => {
   await Deno.mkdir(configDir, { recursive: true });
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${join(tempDir, "profile")}"\n\n[backup]\nlocal_path = "${
-      join(tempDir, "missing-backups")
-    }"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(join(tempDir, "profile"))}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(join(tempDir, "missing-backups"))
+    }\n`,
   );
 
   const result = await runCli(["list"], {
@@ -72,7 +73,9 @@ async function createWorkspace(): Promise<{ tempDir: string; backupDir: string }
   await Deno.mkdir(configDir, { recursive: true });
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupDir)
+    }\n`,
   );
 
   return { tempDir, backupDir };

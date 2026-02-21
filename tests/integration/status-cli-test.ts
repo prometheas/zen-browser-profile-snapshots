@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../src/core/toml-string.ts";
 import { runCli } from "../../src/main.ts";
 
 Deno.test("status shows not installed when config is missing", async () => {
@@ -29,7 +30,9 @@ Deno.test("backup command loads overridden config path", async () => {
   const configPath = `${configDir}/settings.toml`;
   await Deno.writeTextFile(
     configPath,
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${tempDir}/backups"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(`${tempDir}/backups`)
+    }\n`,
   );
 
   const result = await runCli(["backup", "daily"], {
@@ -68,7 +71,9 @@ Deno.test("status shows latest daily and weekly backups with disk usage", async 
   );
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupDir)
+    }\n`,
   );
 
   const result = await runCli(["status"], {
@@ -108,7 +113,9 @@ Deno.test("status reports active scheduled jobs marker and stale warning", async
   await Deno.writeTextFile(join(agentsDir, ".zen-backup-loaded"), "1");
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupDir)
+    }\n`,
   );
 
   const result = await runCli(["status"], {

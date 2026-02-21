@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../src/core/toml-string.ts";
 import { runCli } from "../../src/main.ts";
 
 Deno.test("restore replaces profile with archive content and creates pre-restore backup", async () => {
@@ -99,7 +100,9 @@ async function createWorkspace(): Promise<
 
   await Deno.writeTextFile(
     join(configDir, "settings.toml"),
-    `[profile]\npath = "${profileDir}"\n\n[backup]\nlocal_path = "${backupDir}"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profileDir)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupDir)
+    }\n`,
   );
 
   return { tempDir, profileDir, backupDir };

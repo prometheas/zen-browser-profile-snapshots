@@ -1,6 +1,7 @@
 import { DataTable, Given, Then, When } from "npm:@cucumber/cucumber@12.6.0";
 import { assert, assertEquals } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.4";
+import { toTomlStringLiteral } from "../../../src/core/toml-string.ts";
 import { runCli } from "../../../src/main.ts";
 import { ZenWorld } from "../support/world.ts";
 
@@ -122,7 +123,9 @@ async function writeConfig(
   await Deno.mkdir(dirname(configPath), { recursive: true });
   await Deno.writeTextFile(
     configPath,
-    `[profile]\npath = "${profilePath}"\n\n[backup]\nlocal_path = "${backupPath}"\n`,
+    `[profile]\npath = ${toTomlStringLiteral(profilePath)}\n\n[backup]\nlocal_path = ${
+      toTomlStringLiteral(backupPath)
+    }\n`,
   );
 }
 
