@@ -8,6 +8,8 @@ import {
 
 const DIST_DIR = "dist";
 const TARGETS = ["aarch64-apple-darwin", "x86_64-apple-darwin"] as const;
+const INSTALLER_PACKAGE_NAME = "zen-backup-macos-installer.pkg";
+const INSTALLER_DMG_NAME = "zen-backup-macos-installer.dmg";
 
 if (import.meta.main) {
   await Deno.mkdir(DIST_DIR, { recursive: true });
@@ -19,6 +21,9 @@ if (import.meta.main) {
     await smokeCheckBinary(outputPath);
     artifacts.push({ path: outputPath, target });
   }
+
+  const installerArtifacts = await buildMacosInstallerArtifacts(DIST_DIR);
+  artifacts.push(...installerArtifacts);
 
   await writeChecksumsFile(join(DIST_DIR, "checksums-macos.txt"), artifacts);
 
@@ -69,6 +74,124 @@ async function smokeCheckBinary(path: string): Promise<void> {
   if (out.code !== 1 || !stderr.includes("Usage: zen-backup")) {
     throw new Error(`smoke check failed for ${path}`);
   }
+}
+
+async function buildMacosInstallerArtifacts(distDir: string): Promise<BuiltArtifact[]> {
+  if (Deno.build.os !== "darwin") {
+    console.log("Skipping macOS installer package build on non-darwin host.");
+    return [];
+  }
+
+  const pkgPath = join(distDir, INSTALLER_PACKAGE_NAME);
+  const dmgPath = join(distDir, INSTALLER_DMG_NAME);
+  const rootDir = await Deno.makeTempDir({ prefix: "zen-backup-pkg-root-" });
+  const scriptsDir = await Deno.makeTempDir({ prefix: "zen-backup-pkg-scripts-" });
+  const dmgDir = await Deno.makeTempDir({ prefix: "zen-backup-dmg-" });
+
+  try {
+    const libDir = join(rootDir, "usr", "local", "lib", "zen-backup");
+    await Deno.mkdir(libDir, { recursive: true });
+
+    for (const target of TARGETS) {
+      const source = artifactPath(distDir, target);
+      const destination = join(libDir, `zen-backup-${target}`);
+      await Deno.copyFile(source, destination);
+      await Deno.chmod(destination, 0o755);
+    }
+
+    const postInstallPath = join(scriptsDir, "postinstall");
+    await Deno.writeTextFile(postInstallPath, postInstallScript());
+    await Deno.chmod(postInstallPath, 0o755);
+
+    await runCommand("pkgbuild", [
+      "--root",
+      rootDir,
+      "--identifier",
+      "com.prometheas.zen-backup",
+      "--version",
+      installerVersion(),
+      "--scripts",
+      scriptsDir,
+      pkgPath,
+    ]);
+
+    await Deno.copyFile(pkgPath, join(dmgDir, INSTALLER_PACKAGE_NAME));
+    await Deno.writeTextFile(join(dmgDir, "README.txt"), dmgReadmeText());
+
+    await runCommand("hdiutil", [
+      "create",
+      "-volname",
+      "Zen Backup Installer",
+      "-srcfolder",
+      dmgDir,
+      "-ov",
+      "-format",
+      "UDZO",
+      dmgPath,
+    ]);
+
+    return [
+      { path: pkgPath, target: "macos-pkg-installer" },
+      { path: dmgPath, target: "macos-dmg-installer" },
+    ];
+  } finally {
+    await Deno.remove(rootDir, { recursive: true }).catch(() => undefined);
+    await Deno.remove(scriptsDir, { recursive: true }).catch(() => undefined);
+    await Deno.remove(dmgDir, { recursive: true }).catch(() => undefined);
+  }
+}
+
+async function runCommand(command: string, args: string[]): Promise<void> {
+  const out = await new Deno.Command(command, {
+    args,
+    stdout: "inherit",
+    stderr: "inherit",
+  }).output();
+  if (!out.success) {
+    throw new Error(`${command} failed with exit code ${out.code}`);
+  }
+}
+
+function postInstallScript(): string {
+  return `#!/bin/sh
+set -eu
+
+LIB_DIR="/usr/local/lib/zen-backup"
+TARGET_PATH="/usr/local/bin/zen-backup"
+
+mkdir -p /usr/local/bin
+
+case "$(uname -m)" in
+  arm64|aarch64)
+    SOURCE_PATH="$LIB_DIR/zen-backup-aarch64-apple-darwin"
+    ;;
+  x86_64|amd64)
+    SOURCE_PATH="$LIB_DIR/zen-backup-x86_64-apple-darwin"
+    ;;
+  *)
+    echo "unsupported architecture for installer" >&2
+    exit 1
+    ;;
+esac
+
+install -m 0755 "$SOURCE_PATH" "$TARGET_PATH"
+`;
+}
+
+function dmgReadmeText(): string {
+  return [
+    "Zen Backup macOS Installer",
+    "",
+    "1. Open zen-backup-macos-installer.pkg.",
+    "2. Follow the installer prompts.",
+    "3. Confirm install with: /usr/local/bin/zen-backup status",
+  ].join("\n");
+}
+
+function installerVersion(): string {
+  const explicit = releaseVersion().replace(/^v/, "");
+  const sanitized = explicit.match(/^\d+(\.\d+){0,2}$/) ? explicit : "0.0.0";
+  return sanitized;
 }
 
 function releaseVersion(): string {

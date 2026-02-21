@@ -45,8 +45,11 @@ Optional live smoke on a macOS host:
 
 - `dist/zen-backup-aarch64-apple-darwin`
 - `dist/zen-backup-x86_64-apple-darwin`
+- `dist/zen-backup-macos-installer.pkg`
+- `dist/zen-backup-macos-installer.dmg`
 - `dist/checksums-macos.txt`
 - `dist/release-notes-macos.md`
+- `scripts/install-from-release.sh` (curl install entrypoint)
 
 ## Exit Criteria
 
