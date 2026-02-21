@@ -200,7 +200,8 @@ async function queryLaunchd(options: RuntimeOptions): Promise<SchedulerStatus> {
 }
 
 function resolveHome(options: RuntimeOptions): string {
-  return options.env?.HOME ?? options.env?.USERPROFILE ?? Deno.cwd();
+  const env = options.env ?? Deno.env.toObject();
+  return env.HOME ?? env.USERPROFILE ?? Deno.cwd();
 }
 
 async function shouldUseRealLaunchctl(options: RuntimeOptions): Promise<boolean> {

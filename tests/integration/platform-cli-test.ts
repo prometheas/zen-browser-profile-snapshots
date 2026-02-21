@@ -41,7 +41,9 @@ Deno.test("install uses process HOME when runtime env is not overridden", async 
     assertEquals(result.exitCode, 0);
 
     const configPath = join(tempHome, ".config", "zen-profile-backup", "settings.toml");
+    const dailyPlist = join(tempHome, "Library", "LaunchAgents", "com.prometheas.zen-backup.daily.plist");
     assertEquals(await exists(configPath), true);
+    assertEquals(await exists(dailyPlist), true);
   } finally {
     if (originalHome === undefined) {
       Deno.env.delete("HOME");

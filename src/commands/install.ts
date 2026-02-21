@@ -49,7 +49,7 @@ export async function runInstall(options: RuntimeOptions = {}): Promise<{
 
     const config = await loadConfig({ ...options, env: runtimeEnv, required: true });
     if (!config) throw new Error("failed to load written config");
-    const scheduler = await installScheduler(config, options);
+    const scheduler = await installScheduler(config, { ...options, env: runtimeEnv });
     if (scheduler.installed) {
       stdout.push("Scheduler installed.");
       stdout.push(...scheduler.labels);
