@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertMatch, assertStringIncludes } from "jsr:@std/assert@1.0.19";
-import { join } from "jsr:@std/path@1.1.4";
+import { basename, join } from "jsr:@std/path@1.1.4";
 import { toTomlStringLiteral } from "../../src/core/toml-string.ts";
 import { runCli } from "../../src/main.ts";
 
@@ -19,7 +19,10 @@ Deno.test("backup daily creates tar.gz in daily subdirectory", async () => {
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "Created daily backup:");
   const archivePath = result.stdout.split(": ").at(-1) ?? "";
-  assertMatch(archivePath, /daily\/zen-backup-daily-\d{4}-\d{2}-\d{2}(?:-\d+)?\.tar\.gz$/);
+  assertMatch(
+    archivePath.replaceAll("\\", "/"),
+    /daily\/zen-backup-daily-\d{4}-\d{2}-\d{2}(?:-\d+)?\.tar\.gz$/,
+  );
 
   const list = await listArchive(archivePath);
   assert(list.includes("./places.sqlite") || list.includes("places.sqlite"));
@@ -41,7 +44,10 @@ Deno.test("backup weekly creates tar.gz in weekly subdirectory", async () => {
 
   assertEquals(result.exitCode, 0);
   const archivePath = result.stdout.split(": ").at(-1) ?? "";
-  assertMatch(archivePath, /weekly\/zen-backup-weekly-\d{4}-\d{2}-\d{2}(?:-\d+)?\.tar\.gz$/);
+  assertMatch(
+    archivePath.replaceAll("\\", "/"),
+    /weekly\/zen-backup-weekly-\d{4}-\d{2}-\d{2}(?:-\d+)?\.tar\.gz$/,
+  );
 });
 
 Deno.test("backup includes valid sqlite DB and preserves key tables", async () => {
@@ -233,7 +239,7 @@ Deno.test("backup copies archive to cloud path when configured", async () => {
 
   assertEquals(result.exitCode, 0);
   const localArchive = result.stdout.split(": ").at(-1) ?? "";
-  const cloudArchive = join(cloudRoot, "daily", localArchive.split("/").at(-1) ?? "");
+  const cloudArchive = join(cloudRoot, "daily", basename(localArchive));
   assertEquals(await pathExists(cloudArchive), true);
 });
 

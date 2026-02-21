@@ -56,7 +56,7 @@ Deno.test("renderReleaseNotes includes artifacts and metadata", () => {
 
 Deno.test("artifactPath creates standard file name", () => {
   assertEquals(
-    artifactPath("dist", "aarch64-apple-darwin"),
+    artifactPath("dist", "aarch64-apple-darwin").replaceAll("\\", "/"),
     "dist/zen-backup-aarch64-apple-darwin",
   );
 });

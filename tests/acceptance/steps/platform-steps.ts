@@ -302,8 +302,8 @@ Then("the default is suggested based on platform", function (this: ZenWorld) {
 });
 
 Then("the default backup directory is {string}", function (this: ZenWorld, expected: string) {
-  const resolved = expandKnownPath(this, expected);
-  assertStringIncludes(this.stdout, resolved);
+  const resolved = expandKnownPath(this, expected).replaceAll("\\", "/");
+  assertStringIncludes(this.stdout.replaceAll("\\", "/"), resolved);
 });
 
 Then("{string} appears as a cloud sync option", function (this: ZenWorld, label: string) {
