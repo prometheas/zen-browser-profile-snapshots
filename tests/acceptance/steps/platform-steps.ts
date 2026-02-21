@@ -11,6 +11,8 @@ Before({ tags: "@linux" }, function (this: ZenWorld) {
 
 Before({ tags: "@windows" }, function (this: ZenWorld) {
   this.env.ZEN_BACKUP_TEST_OS = "windows";
+  this.env.ZEN_BACKUP_FORCE_SIMULATED_WINDOWS_SCHEDULER = "1";
+  this.env.ZEN_BACKUP_FORCE_SIMULATED_WINDOWS_TOAST = "1";
 });
 
 Before({ tags: "@macos" }, function (this: ZenWorld) {

@@ -75,6 +75,9 @@ async function notifyWindows(options: NotifyOptions): Promise<string> {
     await appendNotificationWarning(options.backupRoot, "PowerShell toast notification failed");
     return "powershell-toast-failed";
   }
+  if (options.env?.ZEN_BACKUP_FORCE_SIMULATED_WINDOWS_TOAST === "1") {
+    return "powershell-toast-simulated";
+  }
 
   const script = buildWindowsToastScript(options.title, options.message);
   const powershell = await runCommandWithTimeout(
