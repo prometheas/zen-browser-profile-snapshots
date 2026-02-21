@@ -14,6 +14,7 @@ Deno.test("global --help renders help and exits zero", async () => {
   assertEquals(result.exitCode, 0);
   assertEquals(result.stderr, "");
   assertStringIncludes(result.stdout, "Global Options");
+  assertStringIncludes(result.stdout, "-v, --version");
 });
 
 Deno.test("subcommand --help renders command help and exits zero", async () => {
@@ -22,4 +23,18 @@ Deno.test("subcommand --help renders command help and exits zero", async () => {
   assertEquals(result.stderr, "");
   assertStringIncludes(result.stdout, "zen-backup schedule");
   assertStringIncludes(result.stdout, "resume = start");
+});
+
+Deno.test("global -v renders version and exits zero", async () => {
+  const result = await runCli(["-v"], { env: { ZEN_BACKUP_VERSION: "v9.9.9-test" } });
+  assertEquals(result.exitCode, 0);
+  assertEquals(result.stderr, "");
+  assertEquals(result.stdout, "zen-backup v9.9.9-test");
+});
+
+Deno.test("global --version renders version and exits zero", async () => {
+  const result = await runCli(["--version"], { env: { ZEN_BACKUP_VERSION: "v9.9.8-test" } });
+  assertEquals(result.exitCode, 0);
+  assertEquals(result.stderr, "");
+  assertEquals(result.stdout, "zen-backup v9.9.8-test");
 });

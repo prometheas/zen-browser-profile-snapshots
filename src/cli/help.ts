@@ -143,6 +143,7 @@ export function renderHelp(topic: HelpTopic = "root", options: HelpRenderOptions
     "",
     style.label("Global Options"),
     `  ${style.command("-h, --help")}              Show this help`,
+    `  ${style.command("-v, --version")}           Show CLI version`,
     "",
     style.label("Examples"),
     `  ${style.command("zen-backup install")}`,
@@ -160,7 +161,7 @@ export function isHelpFlag(value: string | undefined): boolean {
 function createStyle(color: boolean) {
   return {
     title: (text: string) => paint(color, text, "36"),
-    label: (text: string) => paint(color, paint(color, text, "1"), "33"),
+    label: (text: string) => paint(color, text, "1"),
     command: (text: string) => paint(color, text, "32"),
     subtle: (text: string) => paint(color, text, "2"),
   };

@@ -1,4 +1,5 @@
 import { isHelpFlag, renderHelp } from "./cli/help.ts";
+import { resolveVersion } from "./cli/version.ts";
 import { runBackup } from "./commands/backup.ts";
 import { runInstall } from "./commands/install.ts";
 import { runList } from "./commands/list.ts";
@@ -30,6 +31,16 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
     return {
       exitCode: 0,
       stdout: renderHelp("root", { color }),
+      stderr: "",
+    };
+  }
+  if (args[0] === "-v" || args[0] === "--version" || args[0] === "version") {
+    const version = env.ZEN_BACKUP_VERSION?.trim().length
+      ? env.ZEN_BACKUP_VERSION.trim()
+      : await resolveVersion();
+    return {
+      exitCode: 0,
+      stdout: `zen-backup ${version}`,
       stderr: "",
     };
   }
