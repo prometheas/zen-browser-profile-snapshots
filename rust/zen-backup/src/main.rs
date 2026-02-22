@@ -65,6 +65,21 @@ fn main() {
             }
             std::process::exit(out.exit_code);
         }
+        Some("restore") => {
+            let archive = args.get(1).map(String::as_str).unwrap_or_default();
+            if archive.is_empty() {
+                eprintln!("{}", cli::help::render_root_help());
+                std::process::exit(1);
+            }
+            let out = zen_backup::commands::restore::run_restore(archive, &cwd);
+            if !out.stdout.is_empty() {
+                println!("{}", out.stdout);
+            }
+            if !out.stderr.is_empty() {
+                eprintln!("{}", out.stderr);
+            }
+            std::process::exit(out.exit_code);
+        }
         Some(_) => {
             let code = delegate_to_typescript(&args);
             std::process::exit(code);
