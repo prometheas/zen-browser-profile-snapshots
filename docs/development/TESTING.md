@@ -69,7 +69,7 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - `deno task test:acceptance:platform:macos`
 - Before Linux beta cut:
   - `deno task test:acceptance:platform:linux`
-- Before Windows beta cut:
+- Before Windows alpha cut:
   - `deno task test:acceptance:platform:windows`
   - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:windows:scheduler`
 

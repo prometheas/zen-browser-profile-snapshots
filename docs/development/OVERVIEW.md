@@ -47,6 +47,7 @@ Read `docs/development/TESTING.md` before adding or modifying tests.
 - Release build tasks:
   - `deno task release:macos`
   - `deno task release:linux`
+  - `deno task release:windows`
 - macOS smoke:
   - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:macos:scheduler`
 
@@ -54,3 +55,7 @@ Read `docs/development/TESTING.md` before adding or modifying tests.
 
 - Combined release workflow: `.github/workflows/release-combined.yml`
 - Combined release notes generator: `scripts/generate-combined-release-notes.ts`
+- Combined releases keep artifact names platform-neutral and declare per-platform maturity in notes:
+  - macOS: beta
+  - Linux: beta
+  - Windows: alpha
