@@ -31,6 +31,8 @@ export interface RuntimeOptions {
   cwd?: string;
   now?: Date;
   version?: string;
+  debugEnabled?: boolean;
+  debugLogFilePath?: string;
 }
 
 export interface CommandResult {
