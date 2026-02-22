@@ -5,3 +5,4 @@ import "./retention-steps.ts";
 import "./status-steps.ts";
 import "./restore-steps.ts";
 import "./platform-steps.ts";
+import "./feedback-steps.ts";
