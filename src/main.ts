@@ -1,6 +1,7 @@
 import { isHelpFlag, renderHelp } from "./cli/help.ts";
 import { parseGlobalOptions } from "./cli/global-options.ts";
 import { parseVersionForDisplay, resolveVersion } from "./cli/version.ts";
+import { runRustCli } from "./bridge/rust-cli.ts";
 import { runBackup } from "./commands/backup.ts";
 import { runFeedback } from "./commands/feedback.ts";
 import { runInstall } from "./commands/install.ts";
@@ -20,6 +21,9 @@ export interface CliResult {
 
 export async function runCli(args: string[], options: RuntimeOptions = {}): Promise<CliResult> {
   const env = options.env ?? Deno.env.toObject();
+  if (env.ZEN_BACKUP_USE_RUST_CLI === "1") {
+    return await runRustCli(args, options);
+  }
   const parsedGlobals = parseGlobalOptions(args);
   const effectiveArgs = parsedGlobals.commandArgs;
   const debugEnabled = parsedGlobals.debugEnabled || parsedGlobals.logFilePath !== undefined;

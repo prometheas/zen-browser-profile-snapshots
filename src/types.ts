@@ -33,6 +33,7 @@ export interface RuntimeOptions {
   version?: string;
   debugEnabled?: boolean;
   debugLogFilePath?: string;
+  rustCliPath?: string;
 }
 
 export interface CommandResult {
