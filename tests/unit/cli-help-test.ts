@@ -88,8 +88,11 @@ Deno.test("feedback --help renders command help and exits zero", async () => {
 });
 
 Deno.test("global debug flags are accepted before command", async () => {
-  const result = await runCli(["--debug", "--log-file", "debug.log", "status"], {
-    env: { NO_COLOR: "1" },
+  const tempDir = await Deno.makeTempDir();
+  const result = await runCli(["--debug", "--log-file", `${tempDir}/debug.log`, "status"], {
+    cwd: tempDir,
+    os: "darwin",
+    env: { HOME: tempDir, NO_COLOR: "1" },
   });
   assertEquals(result.exitCode, 0);
   assertStringIncludes(result.stdout, "Not installed");
