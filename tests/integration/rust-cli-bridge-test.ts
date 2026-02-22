@@ -2,6 +2,36 @@ import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.19";
 import { join } from "jsr:@std/path@1.1.4";
 import { runCli } from "../../src/main.ts";
 
+Deno.test("runCli uses rust bridge by default unless TS fallback is requested", async () => {
+  const tempDir = await Deno.makeTempDir();
+  const fakeCli = join(tempDir, "fake-rust-cli.sh");
+  await Deno.writeTextFile(
+    fakeCli,
+    `#!/usr/bin/env sh
+echo "bridge-default:$*"
+exit 7
+`,
+  );
+  await Deno.chmod(fakeCli, 0o755);
+
+  const rustDefault = await runCli(["status"], {
+    env: {
+      ZEN_BACKUP_RUST_CLI_BIN: fakeCli,
+    },
+  });
+  assertEquals(rustDefault.exitCode, 7);
+  assertStringIncludes(rustDefault.stdout, "bridge-default:status");
+
+  const tsFallback = await runCli(["status"], {
+    env: {
+      ZEN_BACKUP_RUST_CLI_BIN: fakeCli,
+      ZEN_BACKUP_USE_TS_CLI: "1",
+    },
+  });
+  assertEquals(tsFallback.exitCode, 0);
+  assertStringIncludes(tsFallback.stdout, "Not installed");
+});
+
 Deno.test("runCli uses rust bridge when ZEN_BACKUP_USE_RUST_CLI is enabled", async () => {
   const tempDir = await Deno.makeTempDir();
   const fakeCli = join(tempDir, "fake-rust-cli.sh");

@@ -21,8 +21,16 @@ export interface CliResult {
 
 export async function runCli(args: string[], options: RuntimeOptions = {}): Promise<CliResult> {
   const env = options.env ?? Deno.env.toObject();
-  if (env.ZEN_BACKUP_USE_RUST_CLI === "1") {
-    return await runRustCli(args, options);
+  if (env.ZEN_BACKUP_USE_TS_CLI !== "1") {
+    try {
+      return await runRustCli(args, options);
+    } catch (error) {
+      const explicitRustBinary = options.rustCliPath || env.ZEN_BACKUP_RUST_CLI_BIN;
+      if (!(error instanceof Deno.errors.NotFound) || explicitRustBinary) {
+        throw error;
+      }
+      // Rust binary is not yet available in this environment; fall back to TS runtime.
+    }
   }
   const parsedGlobals = parseGlobalOptions(args);
   const effectiveArgs = parsedGlobals.commandArgs;

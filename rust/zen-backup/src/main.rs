@@ -150,7 +150,7 @@ fn delegate_to_typescript(args: &[String]) -> i32 {
         .arg("-A")
         .arg("src/main.ts")
         .args(args)
-        .env("ZEN_BACKUP_USE_RUST_CLI", "0")
+        .env("ZEN_BACKUP_USE_TS_CLI", "1")
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit());
 

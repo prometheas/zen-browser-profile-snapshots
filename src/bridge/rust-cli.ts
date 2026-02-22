@@ -30,7 +30,6 @@ export async function runRustCli(
   const env = Object.fromEntries(
     Object.entries(mergedEnv).filter((entry): entry is [string, string] => entry[1] !== undefined),
   );
-  env.ZEN_BACKUP_USE_RUST_CLI = "0";
   const executablePath = await resolveRustCliPath(options, env);
   const command = new Deno.Command(executablePath, {
     args,
