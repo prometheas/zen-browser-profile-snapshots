@@ -110,8 +110,46 @@ jobs:
             dist/zen-backup-aarch64-unknown-linux-gnu
             dist/checksums-linux.txt
 
+  build-windows:
+    needs: resolve-version
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.6.9
+
+      - name: Validate Windows scope
+        shell: bash
+        run: |
+          deno task lint
+          deno task typecheck
+          deno task test:unit
+          deno task test:integration
+          deno task test:acceptance:platform:windows
+          ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:windows:scheduler
+
+      - name: Build Windows artifacts
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.value }}
+        shell: bash
+        run: deno task release:windows
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zen-backup-windows-${{ needs.resolve-version.outputs.value }}
+          path: |
+            dist/zen-backup-x86_64-pc-windows-msvc.exe
+            dist/checksums-windows.txt
+
   publish-release:
-    needs: [resolve-version, build-macos, build-linux]
+    needs: [resolve-version, build-macos, build-linux, build-windows]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -148,6 +186,8 @@ jobs:
             dist/zen-backup-macos-installer.dmg
             dist/zen-backup-x86_64-unknown-linux-gnu
             dist/zen-backup-aarch64-unknown-linux-gnu
+            dist/zen-backup-x86_64-pc-windows-msvc.exe
             dist/checksums-macos.txt
             dist/checksums-linux.txt
+            dist/checksums-windows.txt
           overwrite_files: true

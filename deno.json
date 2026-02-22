@@ -15,7 +15,9 @@
   },
   "lint": {
     "rules": {
-      "tags": ["recommended"]
+      "tags": [
+        "recommended"
+      ]
     }
   },
   "tasks": {
@@ -43,6 +45,7 @@
     "release:macos": "deno run -A scripts/task--release-macos.ts",
     "release:linux": "deno run -A scripts/task--release-linux.ts",
     "test:smoke:macos:scheduler": "deno run -A scripts/task--test--smoke--macos--scheduler.ts",
-    "test:smoke:windows:scheduler": "deno run -A scripts/task--test--smoke--windows--scheduler.ts"
+    "test:smoke:windows:scheduler": "deno run -A scripts/task--test--smoke--windows--scheduler.ts",
+    "release:windows": "deno run -A scripts/task--release-windows.ts"
   }
 }
