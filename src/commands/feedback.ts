@@ -1,4 +1,5 @@
 import { createGitHubIssue, isGitHubCliAvailable } from "../platform/github-cli.ts";
+import { openBrowserUrl } from "../platform/browser.ts";
 import type { RuntimeOptions } from "../types.ts";
 
 interface FeedbackIssue {
@@ -30,7 +31,15 @@ export async function runFeedback(
 
     const hasGh = await isGitHubCliAvailable(options);
     if (!hasGh) {
-      return { exitCode: 1, stdout, stderr: ["GitHub CLI not found.", usage] };
+      const url = feedbackTemplateUrl(kind);
+      const opened = await openBrowserUrl(url, options);
+      if (opened.ok) {
+        stdout.push(`Opened feedback URL: ${url}`);
+        return { exitCode: 0, stdout, stderr };
+      }
+      stderr.push(opened.error ?? "Failed to open browser.");
+      stderr.push(`Open this URL manually: ${url}`);
+      return { exitCode: 1, stdout, stderr };
     }
 
     const created = await createGitHubIssue(issue, options);
@@ -105,4 +114,9 @@ function collectAnswers(
     out[field] = value;
   }
   return out;
+}
+
+function feedbackTemplateUrl(kind: "bug" | "request"): string {
+  const template = kind === "bug" ? "bug-report.yml" : "feature-request.yml";
+  return `https://github.com/prometheas/zen-browser-profile-snapshots/issues/new?template=${template}`;
 }
