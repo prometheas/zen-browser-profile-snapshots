@@ -44,12 +44,22 @@ Use these docs as the primary requirements:
 - `docs/features/`
 - `docs/development/OVERVIEW.md` (developer workflow index)
 - `docs/development/TESTING.md` (test creation and execution guidance)
+- `docs/command-execution-reference.md` (user-facing command flows and platform mechanism
+  disclosure)
 
 When implementation decisions change behavior, update the relevant docs in the same change set:
 
 - `docs/product/user-stories.md`
 - affected `docs/features/**/*.feature`
+- `docs/command-execution-reference.md`
 - any CLI/docs references (for example `README.md`)
+
+Synchronization requirement:
+
+- Keep `docs/command-execution-reference.md` synchronized with `docs/product/user-stories.md` and
+  `docs/features/**/*.feature`.
+- If command behavior, sequencing, scheduler/notification mechanics, or fallback behavior changes,
+  update all three artifacts in the same change.
 
 Story/spec boundary:
 
