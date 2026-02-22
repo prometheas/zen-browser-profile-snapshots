@@ -124,20 +124,25 @@ jobs:
         with:
           deno-version: v2.6.9
 
+      - name: Install SQLite
+        shell: pwsh
+        run: choco install sqlite --no-progress -y
+
       - name: Validate Windows scope
-        shell: bash
+        shell: pwsh
         run: |
           deno task lint
           deno task typecheck
           deno task test:unit
           deno task test:integration
           deno task test:acceptance:platform:windows
-          ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:windows:scheduler
+          $env:ZEN_BACKUP_LIVE_SMOKE = "1"
+          deno task test:smoke:windows:scheduler
 
       - name: Build Windows artifacts
         env:
           RELEASE_VERSION: ${{ needs.resolve-version.outputs.value }}
-        shell: bash
+        shell: pwsh
         run: deno task release:windows
 
       - name: Upload Windows artifacts
