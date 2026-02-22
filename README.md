@@ -98,7 +98,8 @@ install -m 0755 ./zen-backup-<target> /usr/local/bin/zen-backup
 
 ### Build from source (requires Deno 2)
 
-For developer build and test workflows, see `docs/development/OVERVIEW.md`.
+For developer build and test workflows, see
+[`docs/development/OVERVIEW.md`](docs/development/OVERVIEW.md).
 
 ## First-Time Setup
 
@@ -153,15 +154,19 @@ Please include:
 
 Development setup, task conventions, testing strategy, and release workflows are documented in:
 
-- `docs/development/OVERVIEW.md`
+- [`docs/development/OVERVIEW.md`](docs/development/OVERVIEW.md)
 
 ## Docs
 
 The specs are the source of truth:
 
-- `docs/product/vision.md`
-- `docs/product/constitution.md`
-- `docs/product/user-stories.md`
-- `docs/features/`
-- `docs/releases/macos-beta-checklist.md`
-- `docs/releases/linux-beta-checklist.md`
+- [`docs/product/vision.md`](docs/product/vision.md)
+- [`docs/product/constitution.md`](docs/product/constitution.md)
+- [`docs/product/user-stories.md`](docs/product/user-stories.md)
+- [`docs/features/`](docs/features/)
+- [`docs/releases/macos-beta-checklist.md`](docs/releases/macos-beta-checklist.md)
+- [`docs/releases/linux-beta-checklist.md`](docs/releases/linux-beta-checklist.md)
+
+Command-by-command execution flows and platform mechanism disclosures:
+
+- [`docs/command-execution-reference.md`](docs/command-execution-reference.md)
