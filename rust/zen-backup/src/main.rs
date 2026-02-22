@@ -1,11 +1,20 @@
-mod cli;
-
 use std::path::PathBuf;
 use std::process::Command;
+use zen_backup::cli;
 
 fn main() {
     let _test_mode = zen_backup::test_mode::from_env();
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+    let parsed = zen_backup::cli::global_options::parse_global_options(raw_args);
+    let args = parsed.command_args;
+    let debug = zen_backup::debug::DebugLogger::new(
+        parsed.debug_enabled || parsed.log_file_path.is_some(),
+        parsed.log_file_path,
+    );
+    debug.debug(&format!(
+        "argv={}",
+        serde_json::to_string(&args).unwrap_or_default()
+    ));
     if args.is_empty() {
         eprintln!("{}", cli::help::render_root_help());
         std::process::exit(1);
@@ -112,8 +121,20 @@ fn main() {
             }
             std::process::exit(out.exit_code);
         }
+        Some("feedback") => {
+            let kind = args.get(1).map(String::as_str).unwrap_or_default();
+            let out = zen_backup::commands::feedback::run_feedback(kind);
+            if !out.stdout.is_empty() {
+                println!("{}", out.stdout);
+            }
+            if !out.stderr.is_empty() {
+                eprintln!("{}", out.stderr);
+            }
+            std::process::exit(out.exit_code);
+        }
         Some(_) => {
             let code = delegate_to_typescript(&args);
+            debug.debug(&format!("exitCode={code}"));
             std::process::exit(code);
         }
         None => {

@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod feedback;
 pub mod install;
 pub mod list;
 pub mod restore;
