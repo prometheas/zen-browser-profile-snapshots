@@ -15,6 +15,9 @@ Deno.test("global --help renders help and exits zero", async () => {
   assertEquals(result.stderr, "");
   assertStringIncludes(result.stdout, "Global Options");
   assertStringIncludes(result.stdout, "-v, --version");
+  assertStringIncludes(result.stdout, "feedback <bug|request>");
+  assertStringIncludes(result.stdout, "--debug");
+  assertStringIncludes(result.stdout, "--log-file");
 });
 
 Deno.test("subcommand --help renders command help and exits zero", async () => {
@@ -74,4 +77,20 @@ Deno.test("global --version preview stays plain when color disabled", async () =
   });
   assertEquals(result.exitCode, 0);
   assertEquals(result.stdout, "1.2.3-beta.1-7-gec48680");
+});
+
+Deno.test("feedback --help renders command help and exits zero", async () => {
+  const result = await runCli(["feedback", "--help"], { env: { NO_COLOR: "1" } });
+  assertEquals(result.exitCode, 0);
+  assertEquals(result.stderr, "");
+  assertStringIncludes(result.stdout, "zen-backup feedback");
+  assertStringIncludes(result.stdout, "feedback <bug|request>");
+});
+
+Deno.test("global debug flags are accepted before command", async () => {
+  const result = await runCli(["--debug", "--log-file", "debug.log", "status"], {
+    env: { NO_COLOR: "1" },
+  });
+  assertEquals(result.exitCode, 0);
+  assertStringIncludes(result.stdout, "Not installed");
 });

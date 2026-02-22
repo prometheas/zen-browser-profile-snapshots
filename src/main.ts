@@ -1,12 +1,15 @@
 import { isHelpFlag, renderHelp } from "./cli/help.ts";
+import { parseGlobalOptions } from "./cli/global-options.ts";
 import { parseVersionForDisplay, resolveVersion } from "./cli/version.ts";
 import { runBackup } from "./commands/backup.ts";
+import { runFeedback } from "./commands/feedback.ts";
 import { runInstall } from "./commands/install.ts";
 import { runList } from "./commands/list.ts";
 import { runRestore } from "./commands/restore.ts";
 import { runSchedule } from "./commands/schedule.ts";
 import { runStatus } from "./commands/status.ts";
 import { runUninstall } from "./commands/uninstall.ts";
+import { createDebugLogger } from "./debug/logger.ts";
 import type { RuntimeOptions } from "./types.ts";
 
 export interface CliResult {
@@ -17,10 +20,18 @@ export interface CliResult {
 
 export async function runCli(args: string[], options: RuntimeOptions = {}): Promise<CliResult> {
   const env = options.env ?? Deno.env.toObject();
+  const parsedGlobals = parseGlobalOptions(args);
+  const effectiveArgs = parsedGlobals.commandArgs;
+  const debugEnabled = parsedGlobals.debugEnabled || parsedGlobals.logFilePath !== undefined;
+  const debug = createDebugLogger({
+    enabled: debugEnabled,
+    logFilePath: parsedGlobals.logFilePath,
+  });
   const forceColor = env.CLICOLOR_FORCE === "1";
   const color = forceColor || (env.NO_COLOR !== "1" && !Deno.noColor);
+  await debug.debug(`argv=${JSON.stringify(effectiveArgs)}`);
 
-  if (args.length === 0) {
+  if (effectiveArgs.length === 0) {
     return {
       exitCode: 1,
       stdout: "",
@@ -28,14 +39,16 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
     };
   }
 
-  if (isHelpFlag(args[0]) || args[0] === "help") {
+  if (isHelpFlag(effectiveArgs[0]) || effectiveArgs[0] === "help") {
     return {
       exitCode: 0,
       stdout: renderHelp("root", { color }),
       stderr: "",
     };
   }
-  if (args[0] === "-v" || args[0] === "--version" || args[0] === "version") {
+  if (
+    effectiveArgs[0] === "-v" || effectiveArgs[0] === "--version" || effectiveArgs[0] === "version"
+  ) {
     const version = options.version ?? await resolveVersion();
     return {
       exitCode: 0,
@@ -46,21 +59,21 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
 
   let result: { exitCode: number; stdout: string[]; stderr: string[] };
 
-  if (args[0] === "status") {
-    if (isHelpFlag(args[1])) {
+  if (effectiveArgs[0] === "status") {
+    if (isHelpFlag(effectiveArgs[1])) {
       return { exitCode: 0, stdout: renderHelp("status", { color }), stderr: "" };
     }
     result = await runStatus(options);
-  } else if (args[0] === "list") {
-    if (isHelpFlag(args[1])) {
+  } else if (effectiveArgs[0] === "list") {
+    if (isHelpFlag(effectiveArgs[1])) {
       return { exitCode: 0, stdout: renderHelp("list", { color }), stderr: "" };
     }
     result = await runList(options);
-  } else if (args[0] === "backup") {
-    if (isHelpFlag(args[1])) {
+  } else if (effectiveArgs[0] === "backup") {
+    if (isHelpFlag(effectiveArgs[1])) {
       return { exitCode: 0, stdout: renderHelp("backup", { color }), stderr: "" };
     }
-    const kind = args[1];
+    const kind = effectiveArgs[1];
     if (kind !== "daily" && kind !== "weekly") {
       return {
         exitCode: 1,
@@ -69,11 +82,11 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       };
     }
     result = await runBackup(kind, options);
-  } else if (args[0] === "restore") {
-    if (isHelpFlag(args[1])) {
+  } else if (effectiveArgs[0] === "restore") {
+    if (isHelpFlag(effectiveArgs[1])) {
       return { exitCode: 0, stdout: renderHelp("restore", { color }), stderr: "" };
     }
-    const archive = args[1];
+    const archive = effectiveArgs[1];
     if (!archive) {
       return {
         exitCode: 1,
@@ -82,16 +95,16 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       };
     }
     result = await runRestore(archive, options);
-  } else if (args[0] === "install") {
-    if (isHelpFlag(args[1])) {
+  } else if (effectiveArgs[0] === "install") {
+    if (isHelpFlag(effectiveArgs[1])) {
       return { exitCode: 0, stdout: renderHelp("install", { color }), stderr: "" };
     }
     result = await runInstall(options);
-  } else if (args[0] === "uninstall") {
-    if (isHelpFlag(args[1])) {
+  } else if (effectiveArgs[0] === "uninstall") {
+    if (isHelpFlag(effectiveArgs[1])) {
       return { exitCode: 0, stdout: renderHelp("uninstall", { color }), stderr: "" };
     }
-    const purge = args.includes("--purge-backups");
+    const purge = effectiveArgs.includes("--purge-backups");
     result = await runUninstall({
       ...options,
       env: {
@@ -99,11 +112,17 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
         ZEN_BACKUP_PURGE_BACKUPS: purge ? "1" : "0",
       },
     });
-  } else if (args[0] === "schedule") {
-    if (isHelpFlag(args[1])) {
+  } else if (effectiveArgs[0] === "schedule") {
+    if (isHelpFlag(effectiveArgs[1])) {
       return { exitCode: 0, stdout: renderHelp("schedule", { color }), stderr: "" };
     }
-    const action = args[1] as "start" | "resume" | "stop" | "pause" | "status" | undefined;
+    const action = effectiveArgs[1] as
+      | "start"
+      | "resume"
+      | "stop"
+      | "pause"
+      | "status"
+      | undefined;
     if (!action || !["start", "resume", "stop", "pause", "status"].includes(action)) {
       return {
         exitCode: 1,
@@ -112,18 +131,24 @@ export async function runCli(args: string[], options: RuntimeOptions = {}): Prom
       };
     }
     result = await runSchedule(action, options);
+  } else if (effectiveArgs[0] === "feedback") {
+    if (isHelpFlag(effectiveArgs[1])) {
+      return { exitCode: 0, stdout: renderHelp("feedback", { color }), stderr: "" };
+    }
+    result = await runFeedback(effectiveArgs[1] ?? "", options);
   } else {
     result = {
       exitCode: 1,
       stdout: [],
       stderr: [
-        `Unknown command: ${args[0]}`,
+        `Unknown command: ${effectiveArgs[0]}`,
         "",
         renderHelp("root", { color }),
       ],
     };
   }
 
+  await debug.debug(`exitCode=${result.exitCode}`);
   return {
     exitCode: result.exitCode,
     stdout: result.stdout.join("\n"),

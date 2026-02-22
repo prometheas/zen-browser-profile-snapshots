@@ -9,6 +9,7 @@ Given("GitHub CLI is available", function (this: ZenWorld) {
 
 Given("GitHub CLI is unavailable", function (this: ZenWorld) {
   this.env.ZEN_BACKUP_TEST_GH_AVAILABLE = "0";
+  this.env.ZEN_BACKUP_TEST_BROWSER_OPEN = "1";
 });
 
 Given("feedback answers are provided:", function (this: ZenWorld, table: DataTable) {

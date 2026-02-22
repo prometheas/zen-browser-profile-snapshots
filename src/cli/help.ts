@@ -6,7 +6,8 @@ type HelpTopic =
   | "status"
   | "install"
   | "uninstall"
-  | "schedule";
+  | "schedule"
+  | "feedback";
 
 interface HelpRenderOptions {
   color: boolean;
@@ -124,6 +125,21 @@ export function renderHelp(topic: HelpTopic = "root", options: HelpRenderOptions
     ].join("\n");
   }
 
+  if (topic === "feedback") {
+    return [
+      style.title("zen-backup feedback"),
+      "",
+      style.label("Usage"),
+      `  ${style.command("zen-backup feedback <bug|request>")}`,
+      "",
+      style.label("Description"),
+      "  Submit bug reports or feature requests to the project issue tracker.",
+      "",
+      style.label("Options"),
+      `  ${style.command("-h, --help")}    Show help for feedback command`,
+    ].join("\n");
+  }
+
   return [
     style.title("Zen Profile Backup"),
     style.subtle("Reliable daily/weekly profile snapshots with safe restore."),
@@ -140,10 +156,13 @@ export function renderHelp(topic: HelpTopic = "root", options: HelpRenderOptions
     `  ${style.command("install")}                 Create config and install scheduler`,
     `  ${style.command("uninstall")}               Remove scheduler and config`,
     `  ${style.command("schedule <action>")}       Start/stop/pause/resume/status`,
+    `  ${style.command("feedback <bug|request>")}  Submit bug or request feedback`,
     "",
     style.label("Global Options"),
     `  ${style.command("-h, --help")}              Show this help`,
     `  ${style.command("-v, --version")}           Show CLI version`,
+    `  ${style.command("--debug")}                 Enable debug logging to stderr`,
+    `  ${style.command("--log-file [path]")}       Also write debug logs to a file`,
     "",
     style.label("Examples"),
     `  ${style.command("zen-backup install")}`,
