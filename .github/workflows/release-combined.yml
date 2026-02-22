@@ -183,6 +183,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.resolve-version.outputs.value }}
+          prerelease: ${{ contains(needs.resolve-version.outputs.value, '-alpha') || contains(needs.resolve-version.outputs.value, '-beta') }}
           body_path: dist/release-notes.md
           files: |
             dist/zen-backup-aarch64-apple-darwin
