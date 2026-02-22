@@ -440,6 +440,36 @@ stop, and inspect scheduling without reinstalling
 
 ---
 
+## Feedback and Diagnostics
+
+### US-34 In-CLI Feedback Submission
+
+**As a** Zen browser user **I want** to submit bug reports and feature requests from the CLI **So
+that** I can provide actionable feedback without leaving the terminal
+
+**Acceptance criteria:**
+
+- `zen-backup feedback bug` collects required bug details and submits feedback
+- `zen-backup feedback request` collects feature request details and submits feedback
+- If direct CLI submission is unavailable, the tool opens the matching issue template URL
+- Result output clearly states whether feedback was submitted directly or opened in the browser
+
+---
+
+### US-35 Optional Debug Logging for Commands
+
+**As a** Zen browser user **I want** optional debug logging **So that** I can share diagnostics when
+reporting problems
+
+**Acceptance criteria:**
+
+- `--debug` enables debug logs written to stderr for command execution
+- `--log-file [path]` writes the same debug logs to a file
+- If `--log-file` is set without a path, default filename is `zen-backup-debug.log`
+- Debug logging is available as a global option for CLI commands
+
+---
+
 ## Error Handling
 
 ### US-28 Error: Profile Directory Missing

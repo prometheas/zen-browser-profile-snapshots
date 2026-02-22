@@ -44,6 +44,8 @@ Read `docs/development/TESTING.md` before adding or modifying tests.
   - `deno task test:acceptance:platform:linux`
   - `deno task test:acceptance:platform:windows`
   - `deno task test:acceptance:m1`
+  - Focused feedback acceptance:
+    - `deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts docs/features/core/feedback.feature`
 - Release build tasks:
   - `deno task release:macos`
   - `deno task release:linux`
@@ -59,3 +61,12 @@ Read `docs/development/TESTING.md` before adding or modifying tests.
   - macOS: beta
   - Linux: beta
   - Windows: alpha
+
+## Feedback Workflow
+
+- CLI feedback commands:
+  - `zen-backup feedback bug`
+  - `zen-backup feedback request`
+- Debug options:
+  - `--debug`
+  - `--log-file [path]`

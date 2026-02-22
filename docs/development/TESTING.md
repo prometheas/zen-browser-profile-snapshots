@@ -43,6 +43,8 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - `deno task test:integration`
 - Acceptance (all):
   - `deno task test:acceptance`
+  - feedback-only:
+    - `deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts docs/features/core/feedback.feature`
 - Acceptance (platform):
   - `deno task test:acceptance:platform`
   - `deno task test:acceptance:platform:macos`
@@ -65,6 +67,9 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - `deno task test:unit`
   - `deno task test:integration`
   - relevant acceptance subset for your platform/scope
+  - when feedback/debug behavior changes:
+    - `deno test -A tests/unit/feedback-command-test.ts tests/unit/browser-open-test.ts tests/unit/global-options-test.ts tests/unit/debug-logger-test.ts`
+    - `deno test -A tests/integration/feedback-cli-test.ts`
 - Before macOS beta cut:
   - `deno task test:acceptance:platform:macos`
 - Before Linux beta cut:

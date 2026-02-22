@@ -48,6 +48,14 @@ Expected sections:
 - `zen-backup schedule start` (`resume` alias)
 - `zen-backup schedule stop` (`pause` alias)
 - `zen-backup schedule status`
+- `zen-backup feedback bug`
+- `zen-backup feedback request`
+
+Global flags:
+
+- `--debug` to emit debug logs to stderr
+- `--log-file [path]` to additionally write debug logs to file (`zen-backup-debug.log` when no path
+  is provided)
 
 Notes:
 
@@ -121,7 +129,15 @@ Notes:
 
 ## Feedback and Issues
 
-Report bugs and beta feedback in GitHub Issues:
+Submit feedback directly from the CLI:
+
+- `zen-backup feedback bug`
+- `zen-backup feedback request`
+
+If GitHub CLI (`gh`) is available, `zen-backup` creates the issue from your prompt answers. If `gh`
+is unavailable, it opens the matching issue template URL in your browser.
+
+You can also report issues in GitHub:
 
 - <https://github.com/prometheas/zen-browser-profile-snapshots/issues>
 
