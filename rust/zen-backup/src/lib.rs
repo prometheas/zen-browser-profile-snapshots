@@ -8,5 +8,5 @@ pub mod platform;
 pub mod test_mode;
 
 pub fn version_text() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+    option_env!("ZEN_BACKUP_EMBEDDED_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
 }

@@ -55,6 +55,7 @@ Read `docs/development/TESTING.md` before adding or modifying tests.
   - `deno task release:macos`
   - `deno task release:linux`
   - `deno task release:windows`
+  - these tasks now call Cargo target builds via `scripts/build-target.ts`
 - Rust workspace checks:
   - `cargo test -p zen-backup`
   - `cargo clippy -p zen-backup -- -D warnings`

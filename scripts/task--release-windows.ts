@@ -1,6 +1,6 @@
 import { join } from "jsr:@std/path@1.1.4";
 import { type BuiltArtifact, writeChecksumsFile } from "../src/release/artifacts.ts";
-import { withEmbeddedVersion } from "./embedded-version.ts";
+import { buildTarget } from "./build-target.ts";
 
 const distDir = "dist";
 const target = "x86_64-pc-windows-msvc";
@@ -9,16 +9,14 @@ if (import.meta.main) {
   await Deno.mkdir(distDir, { recursive: true });
   const version = releaseVersion();
 
-  const artifacts: BuiltArtifact[] = await withEmbeddedVersion(version, async () => {
-    const outputPath = windowsArtifactPath(target);
-    await compileBinary(target, outputPath);
-    if (Deno.build.os === "windows") {
-      await smokeCheckBinary(outputPath);
-    } else {
-      console.log(`Skipping smoke check for ${target} on ${Deno.build.os}.`);
-    }
-    return [{ path: outputPath, target }];
-  });
+  const outputPath = windowsArtifactPath(target);
+  await compileBinary(target, outputPath, version);
+  if (Deno.build.os === "windows") {
+    await smokeCheckBinary(outputPath);
+  } else {
+    console.log(`Skipping smoke check for ${target} on ${Deno.build.os}.`);
+  }
+  const artifacts: BuiltArtifact[] = [{ path: outputPath, target }];
 
   await writeChecksumsFile(join(distDir, "checksums-windows.txt"), artifacts);
 
@@ -33,22 +31,21 @@ function windowsArtifactPath(targetTriple: string): string {
   return join(distDir, `zen-backup-${targetTriple}.exe`);
 }
 
-async function compileBinary(targetTriple: string, outputPath: string): Promise<void> {
-  const out = await new Deno.Command("deno", {
-    args: [
-      "compile",
-      "--allow-all",
-      "--target",
-      targetTriple,
-      "--output",
-      outputPath,
-      "src/main.ts",
-    ],
-    stdout: "inherit",
-    stderr: "inherit",
-  }).output();
-  if (!out.success) {
-    throw new Error(`compile failed for target ${targetTriple}`);
+async function compileBinary(
+  targetTriple: string,
+  outputPath: string,
+  version: string,
+): Promise<void> {
+  const previous = Deno.env.get("RELEASE_VERSION");
+  Deno.env.set("RELEASE_VERSION", version);
+  try {
+    await buildTarget(targetTriple, outputPath);
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("RELEASE_VERSION");
+    } else {
+      Deno.env.set("RELEASE_VERSION", previous);
+    }
   }
 }
 

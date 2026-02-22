@@ -21,6 +21,9 @@ jobs:
         with:
           deno-version: v2.6.9
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install SQLite
         shell: pwsh
         run: choco install sqlite --no-progress -y
@@ -32,6 +35,7 @@ jobs:
           deno task typecheck
           deno task test:unit
           deno task test:integration
+          cargo test -p zen-backup
           deno task test:acceptance:platform:windows
 
       - name: Windows native scheduler smoke

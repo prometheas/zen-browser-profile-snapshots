@@ -5,7 +5,7 @@ import {
   renderReleaseNotes,
   writeChecksumsFile,
 } from "../src/release/artifacts.ts";
-import { withEmbeddedVersion } from "./embedded-version.ts";
+import { buildTarget } from "./build-target.ts";
 
 const DIST_DIR = "dist";
 const TARGETS = ["aarch64-apple-darwin", "x86_64-apple-darwin"] as const;
@@ -16,19 +16,15 @@ if (import.meta.main) {
   await Deno.mkdir(DIST_DIR, { recursive: true });
   const version = releaseVersion();
 
-  const artifacts: BuiltArtifact[] = await withEmbeddedVersion(version, async () => {
-    const built: BuiltArtifact[] = [];
-    for (const target of TARGETS) {
-      const outputPath = artifactPath(DIST_DIR, target);
-      await compileBinary(target, outputPath);
-      await smokeCheckBinary(outputPath);
-      built.push({ path: outputPath, target });
-    }
-
-    const installerArtifacts = await buildMacosInstallerArtifacts(DIST_DIR);
-    built.push(...installerArtifacts);
-    return built;
-  });
+  const artifacts: BuiltArtifact[] = [];
+  for (const target of TARGETS) {
+    const outputPath = artifactPath(DIST_DIR, target);
+    await compileBinary(target, outputPath, version);
+    await smokeCheckBinary(outputPath);
+    artifacts.push({ path: outputPath, target });
+  }
+  const installerArtifacts = await buildMacosInstallerArtifacts(DIST_DIR);
+  artifacts.push(...installerArtifacts);
 
   await writeChecksumsFile(join(DIST_DIR, "checksums-macos.txt"), artifacts);
 
@@ -48,23 +44,17 @@ if (import.meta.main) {
   console.log("- dist/release-notes-macos.md");
 }
 
-async function compileBinary(target: string, outputPath: string): Promise<void> {
-  const cmd = new Deno.Command("deno", {
-    args: [
-      "compile",
-      "--allow-all",
-      "--target",
-      target,
-      "--output",
-      outputPath,
-      "src/main.ts",
-    ],
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const out = await cmd.output();
-  if (!out.success) {
-    throw new Error(`compile failed for target ${target}`);
+async function compileBinary(target: string, outputPath: string, version: string): Promise<void> {
+  const previous = Deno.env.get("RELEASE_VERSION");
+  Deno.env.set("RELEASE_VERSION", version);
+  try {
+    await buildTarget(target, outputPath);
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("RELEASE_VERSION");
+    } else {
+      Deno.env.set("RELEASE_VERSION", previous);
+    }
   }
 }
 

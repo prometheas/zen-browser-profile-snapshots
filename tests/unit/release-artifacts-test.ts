@@ -60,3 +60,10 @@ Deno.test("artifactPath creates standard file name", () => {
     "dist/zen-backup-aarch64-apple-darwin",
   );
 });
+
+Deno.test("build-target script uses cargo release builds", async () => {
+  const script = await Deno.readTextFile("scripts/build-target.ts");
+  assertStringIncludes(script, 'new Deno.Command("cargo"');
+  assertStringIncludes(script, "--release");
+  assertStringIncludes(script, "--target");
+});

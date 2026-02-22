@@ -8,8 +8,8 @@ backup API rather than raw file copies.
 ## Status
 
 Current release status is macOS beta, with Linux beta-in-progress. Core CLI functionality is
-implemented with Deno and covered by unit, integration, and acceptance tests. Windows parity is
-planned for Milestone 2 completion.
+implemented with a Rust runtime and covered by unit, integration, and acceptance tests. Deno remains
+the test harness/tooling layer. Windows parity is planned for Milestone 2 completion.
 
 ## Key Capabilities
 
@@ -96,7 +96,7 @@ Download the platform binary from GitHub Releases and install:
 install -m 0755 ./zen-backup-<target> /usr/local/bin/zen-backup
 ```
 
-### Build from source (requires Deno 2)
+### Build from source (requires Deno 2 + Rust)
 
 For developer build and test workflows, see
 [`docs/development/OVERVIEW.md`](docs/development/OVERVIEW.md).

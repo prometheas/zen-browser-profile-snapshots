@@ -1,6 +1,6 @@
 import { join } from "jsr:@std/path@1.1.4";
 import { artifactPath, type BuiltArtifact, writeChecksumsFile } from "../src/release/artifacts.ts";
-import { withEmbeddedVersion } from "./embedded-version.ts";
+import { buildTarget } from "./build-target.ts";
 
 const distDir = "dist";
 const targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"] as const;
@@ -9,20 +9,17 @@ if (import.meta.main) {
   await Deno.mkdir(distDir, { recursive: true });
   const version = releaseVersion();
 
-  const artifacts: BuiltArtifact[] = await withEmbeddedVersion(version, async () => {
-    const built: BuiltArtifact[] = [];
-    for (const target of targets) {
-      const outputPath = artifactPath(distDir, target);
-      await compileBinary(target, outputPath);
-      if (canExecuteOnCurrentHost(target)) {
-        await smokeCheckBinary(outputPath);
-      } else {
-        console.log(`Skipping smoke check for ${target} on ${Deno.build.arch}-${Deno.build.os}`);
-      }
-      built.push({ path: outputPath, target });
+  const artifacts: BuiltArtifact[] = [];
+  for (const target of targets) {
+    const outputPath = artifactPath(distDir, target);
+    await compileBinary(target, outputPath, version);
+    if (canExecuteOnCurrentHost(target)) {
+      await smokeCheckBinary(outputPath);
+    } else {
+      console.log(`Skipping smoke check for ${target} on ${Deno.build.arch}-${Deno.build.os}`);
     }
-    return built;
-  });
+    artifacts.push({ path: outputPath, target });
+  }
 
   await writeChecksumsFile(join(distDir, "checksums-linux.txt"), artifacts);
   await Deno.writeTextFile(
@@ -45,22 +42,17 @@ if (import.meta.main) {
   console.log("- dist/release-notes-linux.md");
 }
 
-async function compileBinary(target: string, outputPath: string): Promise<void> {
-  const out = await new Deno.Command("deno", {
-    args: [
-      "compile",
-      "--allow-all",
-      "--target",
-      target,
-      "--output",
-      outputPath,
-      "src/main.ts",
-    ],
-    stdout: "inherit",
-    stderr: "inherit",
-  }).output();
-  if (!out.success) {
-    throw new Error(`compile failed for target ${target}`);
+async function compileBinary(target: string, outputPath: string, version: string): Promise<void> {
+  const previous = Deno.env.get("RELEASE_VERSION");
+  Deno.env.set("RELEASE_VERSION", version);
+  try {
+    await buildTarget(target, outputPath);
+  } finally {
+    if (previous === undefined) {
+      Deno.env.delete("RELEASE_VERSION");
+    } else {
+      Deno.env.set("RELEASE_VERSION", previous);
+    }
   }
 }
 
