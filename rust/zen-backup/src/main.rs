@@ -1,5 +1,6 @@
 mod cli;
 
+use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
@@ -13,6 +14,8 @@ fn main() {
     let env = std::env::vars().collect::<std::collections::HashMap<_, _>>();
     let color = env.get("CLICOLOR_FORCE").map(String::as_str) == Some("1")
         || env.get("NO_COLOR").map(String::as_str) != Some("1");
+
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     match args.first().map(String::as_str) {
         Some("--help") | Some("-h") | Some("help") => {
@@ -30,6 +33,26 @@ fn main() {
         }
         Some("feedback") if args.get(1).map(String::as_str) == Some("--help") => {
             println!("{}", cli::help::render_feedback_help());
+        }
+        Some("status") => {
+            let out = zen_backup::commands::status::run_status(&cwd);
+            if !out.stdout.is_empty() {
+                println!("{}", out.stdout);
+            }
+            if !out.stderr.is_empty() {
+                eprintln!("{}", out.stderr);
+            }
+            std::process::exit(out.exit_code);
+        }
+        Some("list") => {
+            let out = zen_backup::commands::list::run_list(&cwd);
+            if !out.stdout.is_empty() {
+                println!("{}", out.stdout);
+            }
+            if !out.stderr.is_empty() {
+                eprintln!("{}", out.stderr);
+            }
+            std::process::exit(out.exit_code);
         }
         Some(_) => {
             let code = delegate_to_typescript(&args);
