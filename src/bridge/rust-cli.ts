@@ -10,9 +10,22 @@ export async function runRustCli(
   args: string[],
   options: RuntimeOptions = {},
 ): Promise<RustCliResult> {
+  const bridgeEnv: Record<string, string | undefined> = {
+    ...(options.env ?? {}),
+  };
+  if (options.os) {
+    bridgeEnv.ZEN_BACKUP_TEST_OS = options.os;
+  }
+  if (options.now) {
+    bridgeEnv.ZEN_BACKUP_TEST_NOW = options.now.toISOString();
+  }
+  if (options.version) {
+    bridgeEnv.ZEN_BACKUP_TEST_VERSION = options.version;
+  }
+
   const mergedEnv = {
     ...Deno.env.toObject(),
-    ...(options.env ?? {}),
+    ...bridgeEnv,
   };
   const env = Object.fromEntries(
     Object.entries(mergedEnv).filter((entry): entry is [string, string] => entry[1] !== undefined),
