@@ -31,7 +31,7 @@ export async function runRustCli(
     Object.entries(mergedEnv).filter((entry): entry is [string, string] => entry[1] !== undefined),
   );
   env.ZEN_BACKUP_USE_RUST_CLI = "0";
-  const executablePath = options.rustCliPath ?? env.ZEN_BACKUP_RUST_CLI_BIN ?? "zen-backup";
+  const executablePath = await resolveRustCliPath(options, env);
   const command = new Deno.Command(executablePath, {
     args,
     env,
@@ -45,4 +45,37 @@ export async function runRustCli(
     stdout: new TextDecoder().decode(output.stdout).trimEnd(),
     stderr: new TextDecoder().decode(output.stderr).trimEnd(),
   };
+}
+
+async function resolveRustCliPath(
+  options: RuntimeOptions,
+  env: Record<string, string>,
+): Promise<string> {
+  if (options.rustCliPath && options.rustCliPath.trim().length > 0) {
+    return options.rustCliPath;
+  }
+  if (env.ZEN_BACKUP_RUST_CLI_BIN && env.ZEN_BACKUP_RUST_CLI_BIN.trim().length > 0) {
+    return env.ZEN_BACKUP_RUST_CLI_BIN;
+  }
+
+  const workspaceRoot = new URL("../../", import.meta.url);
+  const devBinary = new URL("target/debug/zen-backup", workspaceRoot);
+  if (await exists(devBinary)) {
+    return fromFileUrl(devBinary);
+  }
+
+  return "zen-backup";
+}
+
+async function exists(pathUrl: URL): Promise<boolean> {
+  try {
+    await Deno.stat(pathUrl);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function fromFileUrl(pathUrl: URL): string {
+  return decodeURIComponent(pathUrl.pathname);
 }
