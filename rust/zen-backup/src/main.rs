@@ -80,6 +80,38 @@ fn main() {
             }
             std::process::exit(out.exit_code);
         }
+        Some("install") => {
+            let out = zen_backup::commands::install::run_install(&cwd);
+            if !out.stdout.is_empty() {
+                println!("{}", out.stdout);
+            }
+            if !out.stderr.is_empty() {
+                eprintln!("{}", out.stderr);
+            }
+            std::process::exit(out.exit_code);
+        }
+        Some("uninstall") => {
+            let purge_backups = args.iter().any(|arg| arg == "--purge-backups");
+            let out = zen_backup::commands::uninstall::run_uninstall(&cwd, purge_backups);
+            if !out.stdout.is_empty() {
+                println!("{}", out.stdout);
+            }
+            if !out.stderr.is_empty() {
+                eprintln!("{}", out.stderr);
+            }
+            std::process::exit(out.exit_code);
+        }
+        Some("schedule") => {
+            let action = args.get(1).map(String::as_str).unwrap_or("status");
+            let out = zen_backup::commands::schedule::run_schedule(action);
+            if !out.stdout.is_empty() {
+                println!("{}", out.stdout);
+            }
+            if !out.stderr.is_empty() {
+                eprintln!("{}", out.stderr);
+            }
+            std::process::exit(out.exit_code);
+        }
         Some(_) => {
             let code = delegate_to_typescript(&args);
             std::process::exit(code);

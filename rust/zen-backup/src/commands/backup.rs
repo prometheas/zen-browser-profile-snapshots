@@ -159,7 +159,10 @@ fn copy_allowed_entries(
             Err(_) => continue,
         };
         let rel_norm = rel.to_string_lossy().replace('\\', "/");
-        let file_name = path.file_name().and_then(|v| v.to_str()).unwrap_or_default();
+        let file_name = path
+            .file_name()
+            .and_then(|v| v.to_str())
+            .unwrap_or_default();
         let is_dir = path.is_dir();
         if !should_include(&rel_norm, file_name, is_dir) {
             continue;
@@ -241,7 +244,10 @@ fn is_sqlite_file(file_name: &str) -> bool {
 fn backup_sqlite_database(source: &Path, target: &Path) -> Result<bool, ()> {
     let backup_cmd = Command::new("sqlite3")
         .arg(source)
-        .arg(format!(".backup '{}'", target.to_string_lossy().replace('\'', "''")))
+        .arg(format!(
+            ".backup '{}'",
+            target.to_string_lossy().replace('\'', "''")
+        ))
         .status()
         .map_err(|_| ())?;
     if backup_cmd.success() {
@@ -324,7 +330,10 @@ fn prune_archives(root: &Path, kind: &str, retention_days: i64, now_date: &str) 
         if !path.is_file() {
             continue;
         }
-        let name = path.file_name().and_then(|v| v.to_str()).unwrap_or_default();
+        let name = path
+            .file_name()
+            .and_then(|v| v.to_str())
+            .unwrap_or_default();
         if !name.ends_with(".tar.gz") {
             continue;
         }

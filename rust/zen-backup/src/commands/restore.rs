@@ -37,16 +37,17 @@ pub fn run_restore(archive_arg: &str, cwd: &Path) -> CommandOutput {
         };
     }
 
-    let archive_path = match resolve_archive_path(archive_arg, cwd, Path::new(&config.backup_local_path)) {
-        Some(v) => v,
-        None => {
-            return CommandOutput {
-                exit_code: 1,
-                stdout: String::new(),
-                stderr: format!("archive not found: {archive_arg}"),
+    let archive_path =
+        match resolve_archive_path(archive_arg, cwd, Path::new(&config.backup_local_path)) {
+            Some(v) => v,
+            None => {
+                return CommandOutput {
+                    exit_code: 1,
+                    stdout: String::new(),
+                    stderr: format!("archive not found: {archive_arg}"),
+                }
             }
-        }
-    };
+        };
 
     let staging_dir = match extract_archive_safely(&archive_path) {
         Ok(v) => v,
@@ -116,7 +117,11 @@ pub fn run_restore(archive_arg: &str, cwd: &Path) -> CommandOutput {
 fn resolve_archive_path(input: &str, cwd: &Path, backup_root: &Path) -> Option<PathBuf> {
     let raw = PathBuf::from(input);
     let candidates = vec![
-        if raw.is_absolute() { raw.clone() } else { cwd.join(&raw) },
+        if raw.is_absolute() {
+            raw.clone()
+        } else {
+            cwd.join(&raw)
+        },
         backup_root.join(input),
         backup_root.join("daily").join(input),
         backup_root.join("weekly").join(input),
@@ -133,7 +138,10 @@ fn extract_archive_safely(archive: &Path) -> Result<PathBuf, String> {
     if !list.status.success() {
         return Err(format!(
             "invalid or corrupted archive: {}",
-            archive.file_name().unwrap_or_else(|| OsStr::new("archive")).to_string_lossy()
+            archive
+                .file_name()
+                .unwrap_or_else(|| OsStr::new("archive"))
+                .to_string_lossy()
         ));
     }
     let listing = String::from_utf8_lossy(&list.stdout);
@@ -156,7 +164,10 @@ fn extract_archive_safely(archive: &Path) -> Result<PathBuf, String> {
         let _ = fs::remove_dir_all(&staging);
         return Err(format!(
             "invalid or corrupted archive: {}",
-            archive.file_name().unwrap_or_else(|| OsStr::new("archive")).to_string_lossy()
+            archive
+                .file_name()
+                .unwrap_or_else(|| OsStr::new("archive"))
+                .to_string_lossy()
         ));
     }
     Ok(staging)
@@ -185,13 +196,19 @@ fn rotate_profile_to_prerestore(profile: &Path) -> Result<PathBuf, String> {
     let mut candidate = PathBuf::from(format!("{}.pre-restore-{}", profile.display(), date));
     let mut idx = 2;
     while candidate.exists() {
-        candidate = PathBuf::from(format!("{}.pre-restore-{}-{}", profile.display(), date, idx));
+        candidate = PathBuf::from(format!(
+            "{}.pre-restore-{}-{}",
+            profile.display(),
+            date,
+            idx
+        ));
         idx += 1;
     }
     if profile.exists() {
         fs::rename(profile, &candidate).map_err(|_| "failed to rotate profile".to_string())?;
     } else {
-        fs::create_dir_all(&candidate).map_err(|_| "failed to create pre-restore dir".to_string())?;
+        fs::create_dir_all(&candidate)
+            .map_err(|_| "failed to create pre-restore dir".to_string())?;
     }
     Ok(candidate)
 }
