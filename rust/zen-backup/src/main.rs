@@ -54,6 +54,17 @@ fn main() {
             }
             std::process::exit(out.exit_code);
         }
+        Some("backup") => {
+            let kind = args.get(1).map(String::as_str).unwrap_or_default();
+            let out = zen_backup::commands::backup::run_backup(kind, &cwd);
+            if !out.stdout.is_empty() {
+                println!("{}", out.stdout);
+            }
+            if !out.stderr.is_empty() {
+                eprintln!("{}", out.stderr);
+            }
+            std::process::exit(out.exit_code);
+        }
         Some(_) => {
             let code = delegate_to_typescript(&args);
             std::process::exit(code);
