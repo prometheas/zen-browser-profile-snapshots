@@ -13,6 +13,11 @@ This document is the entry point for contributor and agent-facing development wo
 
 - Runtime/tooling: Deno 2
 - Optional local environment management: `flake.nix` + `.envrc` (direnv)
+- Rust toolchain for runtime migration:
+  - `cargo`
+  - `rustc`
+  - `clippy`
+  - `rustfmt`
 
 ## Task Conventions
 
@@ -50,6 +55,10 @@ Read `docs/development/TESTING.md` before adding or modifying tests.
   - `deno task release:macos`
   - `deno task release:linux`
   - `deno task release:windows`
+- Rust workspace checks:
+  - `cargo test -p zen-backup`
+  - `cargo clippy -p zen-backup -- -D warnings`
+  - `cargo fmt --check`
 - macOS smoke:
   - `ZEN_BACKUP_LIVE_SMOKE=1 deno task test:smoke:macos:scheduler`
 

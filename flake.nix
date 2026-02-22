@@ -14,6 +14,10 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             deno
+            rustc
+            cargo
+            clippy
+            rustfmt
             git
             jq
             sqlite
