@@ -1,13 +1,62 @@
+mod cli;
+
+use std::process::Command;
+
 fn main() {
     let _test_mode = zen_backup::test_mode::from_env();
-    let mut args = std::env::args();
-    let _ = args.next();
-    match args.next().as_deref() {
-        Some("--version") | Some("-v") | Some("version") => {
-            println!("{}", zen_backup::version_text());
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.is_empty() {
+        eprintln!("{}", cli::help::render_root_help());
+        std::process::exit(1);
+    }
+
+    let env = std::env::vars().collect::<std::collections::HashMap<_, _>>();
+    let color = env.get("CLICOLOR_FORCE").map(String::as_str) == Some("1")
+        || env.get("NO_COLOR").map(String::as_str) != Some("1");
+
+    match args.first().map(String::as_str) {
+        Some("--help") | Some("-h") | Some("help") => {
+            println!("{}", cli::help::render_root_help());
         }
-        _ => {
-            println!("zen-backup (rust scaffold)");
+        Some("--version") | Some("-v") | Some("version") => {
+            let version = env
+                .get("ZEN_BACKUP_TEST_VERSION")
+                .map(String::as_str)
+                .unwrap_or_else(|| zen_backup::version_text());
+            println!("{}", cli::version::format_version(version, color));
+        }
+        Some("schedule") if args.get(1).map(String::as_str) == Some("--help") => {
+            println!("{}", cli::help::render_schedule_help());
+        }
+        Some("feedback") if args.get(1).map(String::as_str) == Some("--help") => {
+            println!("{}", cli::help::render_feedback_help());
+        }
+        Some(_) => {
+            let code = delegate_to_typescript(&args);
+            std::process::exit(code);
+        }
+        None => {
+            eprintln!("{}", cli::help::render_root_help());
+            std::process::exit(1);
+        }
+    }
+}
+
+fn delegate_to_typescript(args: &[String]) -> i32 {
+    let mut cmd = Command::new("deno");
+    cmd.arg("run")
+        .arg("-A")
+        .arg("src/main.ts")
+        .args(args)
+        .env("ZEN_BACKUP_USE_RUST_CLI", "0")
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit());
+
+    match cmd.status() {
+        Ok(status) => status.code().unwrap_or(1),
+        Err(err) => {
+            eprintln!("failed to launch TypeScript fallback runtime: {err}");
+            1
         }
     }
 }
