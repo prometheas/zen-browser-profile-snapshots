@@ -2335,19 +2335,48 @@ async fn main() {
 
     let scheduling_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/features/platform/scheduling.feature");
-    AcceptanceWorld::filter_run(scheduling_feature, |feature, _, scenario| {
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "darwin");
+    AcceptanceWorld::filter_run(scheduling_feature.clone(), |feature, _, scenario| {
         feature.name == "Scheduling"
             && matches!(
                 scenario.name.as_str(),
                 "Schedule status reports daily and weekly states"
                     | "Schedule stop disables scheduled jobs without uninstalling"
                     | "Schedule start enables paused jobs"
+                    | "Schedule aliases map to primary commands"
+            )
+    })
+    .await;
+
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "linux");
+    AcceptanceWorld::filter_run(scheduling_feature.clone(), |feature, _, scenario| {
+        feature.name == "Scheduling"
+            && matches!(
+                scenario.name.as_str(),
+                "Schedule stop disables systemd timers without uninstalling"
+                    | "Schedule start enables paused systemd timers"
+                    | "Schedule aliases map to primary commands on Linux"
+                    | "Schedule status reports daily and weekly timer states"
+            )
+    })
+    .await;
+
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "windows");
+    AcceptanceWorld::filter_run(scheduling_feature, |feature, _, scenario| {
+        feature.name == "Scheduling"
+            && matches!(
+                scenario.name.as_str(),
+                "Schedule stop disables scheduled tasks without uninstalling"
+                    | "Schedule start enables paused tasks"
+                    | "Schedule aliases map to primary commands on Windows"
+                    | "Schedule status reports daily and weekly task states"
             )
     })
     .await;
 
     let notifications_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/features/platform/notifications.feature");
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "darwin");
     AcceptanceWorld::filter_run(notifications_feature, |feature, _, scenario| {
         feature.name == "Notifications"
             && scenario.name
@@ -2492,11 +2521,17 @@ fn run_command_args_with_workspace(
     workspace: &Path,
     args: &[String],
 ) {
+    let test_os = world
+        .env
+        .get("ZEN_BACKUP_TEST_OS")
+        .cloned()
+        .or_else(|| std::env::var("ZEN_BACKUP_TEST_OS").ok())
+        .unwrap_or_else(|| "darwin".to_string());
     let output = Command::new(resolve_cli_path())
         .args(args)
         .current_dir(workspace)
         .env("HOME", workspace)
-        .env("ZEN_BACKUP_TEST_OS", "darwin")
+        .env("ZEN_BACKUP_TEST_OS", test_os)
         .envs(world.env.clone())
         .output()
         .expect("failed to execute zen-backup");
