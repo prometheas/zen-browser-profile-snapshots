@@ -100,8 +100,8 @@ Story/spec boundary:
   with `--` in the script name.
 - Preferred mapping pattern:
   - task: `test:acceptance:*`
-  - script: `scripts/task--test-acceptance.ts` (or another focused `scripts/task--<task-family>.ts`
-    wrapper)
+  - script: `scripts/task--test-acceptance--rust.ts` (or another focused
+    `scripts/task--<task-family>.ts` wrapper)
 - When adding/changing tasks, update all references in the same change:
   - `deno.json`
   - CI workflows under `.github/workflows/`
