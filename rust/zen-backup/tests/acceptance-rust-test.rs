@@ -391,6 +391,29 @@ async fn backup_tool_installed(world: &mut AcceptanceWorld) {
     assert_eq!(world.exit_code, 0, "install failed: {}", world.stderr);
 }
 
+#[given("the backup scheduled jobs are installed")]
+async fn backup_scheduled_jobs_installed(world: &mut AcceptanceWorld) {
+    backup_tool_installed(world).await;
+    ensure_backup_workspace(world);
+}
+
+#[given("no backup scheduled jobs are installed")]
+async fn no_backup_scheduled_jobs_installed(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    let workspace = ensure_workspace(world);
+    let resources_root = workspace.join("resources");
+    let _ = fs::remove_file(
+        resources_root
+            .join("launchd")
+            .join("com.prometheas.zen-backup.daily.plist"),
+    );
+    let _ = fs::remove_file(
+        resources_root
+            .join("launchd")
+            .join("com.prometheas.zen-backup.weekly.plist"),
+    );
+}
+
 #[given(expr = "{string} was run")]
 async fn command_was_run(world: &mut AcceptanceWorld, command: String) {
     run_command(world, &command);
@@ -832,6 +855,15 @@ async fn stdout_lists(world: &mut AcceptanceWorld, value: String) {
     );
 }
 
+#[then("stdout indicates scheduled jobs are active")]
+async fn stdout_indicates_scheduled_jobs_active(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("active"),
+        "expected status output to indicate active jobs, got `{}`",
+        world.stdout
+    );
+}
+
 #[then(expr = "a macOS notification is displayed with title {string}")]
 async fn macos_notification_with_title(world: &mut AcceptanceWorld, title: String) {
     let backup_dir = world
@@ -1059,6 +1091,8 @@ async fn main() {
                 "Status shows \"Not installed\" when settings.toml is missing"
                     | "Status shows most recent daily backup"
                     | "Status shows most recent weekly backup"
+                    | "Status indicates scheduled jobs are loaded"
+                    | "Status indicates no scheduled jobs"
             )
     })
     .await;
