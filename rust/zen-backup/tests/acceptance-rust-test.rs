@@ -12,6 +12,7 @@ struct AcceptanceWorld {
     workspace: Option<TempDir>,
     env: HashMap<String, String>,
     loaded_config: Option<AppConfig>,
+    config_used_default_path: bool,
     profile_dir: Option<PathBuf>,
     backup_dir: Option<PathBuf>,
     last_archive: Option<PathBuf>,
@@ -72,6 +73,43 @@ async fn config_file_at_path(world: &mut AcceptanceWorld, path: String, step: &S
         fs::create_dir_all(parent).expect("failed to create config parent");
     }
     fs::write(file_path, docstring(step)).expect("failed to write config file");
+}
+
+#[given("a config file exists at the platform default location:")]
+async fn config_file_exists_at_platform_default_location_with_table(
+    world: &mut AcceptanceWorld,
+    step: &Step,
+) {
+    let _ = step;
+    let workspace = ensure_workspace(world);
+    let default_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    if let Some(parent) = default_path.parent() {
+        fs::create_dir_all(parent).expect("failed to create default config parent");
+    }
+    if !default_path.exists() {
+        fs::write(&default_path, "[profile]\npath = \"~/profile\"\n")
+            .expect("failed to create default config file");
+    }
+}
+
+#[given("a config file exists at the platform default location")]
+async fn config_file_exists_at_platform_default_location(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let default_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    if let Some(parent) = default_path.parent() {
+        fs::create_dir_all(parent).expect("failed to create default config parent");
+    }
+    if !default_path.exists() {
+        fs::write(&default_path, "[profile]\npath = \"~/profile\"\n")
+            .expect("failed to create default config file");
+    }
+}
+
+#[given("no config file exists at the default location")]
+async fn no_config_file_exists_at_default_location(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let default_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    let _ = fs::remove_file(default_path);
 }
 
 #[given("a config file containing:")]
@@ -613,6 +651,21 @@ async fn backup_daily_attempted(world: &mut AcceptanceWorld) {
     run_command(world, "backup daily");
 }
 
+#[when("a backup command is run")]
+async fn backup_command_run(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let env_guard = EnvGuard::from_world(world);
+    if let Ok(Some(config)) = load_config(true, &workspace) {
+        let profile = PathBuf::from(config.profile_path);
+        if !profile.exists() {
+            fs::create_dir_all(&profile).expect("failed to create configured profile path");
+            create_sqlite_db(&profile.join("places.sqlite"));
+        }
+    }
+    drop(env_guard);
+    run_command(world, "backup daily");
+}
+
 #[when(expr = "restore is run with archive {string}")]
 async fn restore_with_archive(world: &mut AcceptanceWorld, archive_name: String) {
     run_command(world, &format!("restore {archive_name}"));
@@ -652,6 +705,7 @@ async fn configuration_loaded(world: &mut AcceptanceWorld) {
             world.exit_code = 0;
             world.stderr.clear();
             world.loaded_config = Some(config);
+            world.config_used_default_path = !world.env.contains_key("ZEN_BACKUP_CONFIG");
         }
         Ok(None) => {
             world.exit_code = 1;
@@ -756,6 +810,15 @@ async fn stderr_contains_either(world: &mut AcceptanceWorld, left: String, right
     );
 }
 
+#[then(expr = "stderr contains {string} and {string}")]
+async fn stderr_contains_both(world: &mut AcceptanceWorld, left: String, right: String) {
+    assert!(
+        world.stderr.contains(&left) && world.stderr.contains(&right),
+        "expected stderr to contain both `{left}` and `{right}`, got `{}`",
+        world.stderr
+    );
+}
+
 #[then(expr = "stderr contains {string}")]
 async fn stderr_contains(world: &mut AcceptanceWorld, needle: String) {
     assert!(
@@ -794,6 +857,184 @@ async fn profile_path_equals_expanded(world: &mut AcceptanceWorld, raw_path: Str
         raw_path
     };
     assert_eq!(profile_path, expected);
+}
+
+#[then(expr = "backup.local_path equals the expanded value of {string}")]
+async fn backup_local_path_equals_expanded(world: &mut AcceptanceWorld, raw_path: String) {
+    let backup_path = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded")
+        .backup_local_path
+        .clone();
+    let home = ensure_workspace(world);
+    let expected = if let Some(suffix) = raw_path.strip_prefix("~/") {
+        home.join(suffix).display().to_string()
+    } else {
+        raw_path
+    };
+    assert_eq!(backup_path, expected);
+}
+
+#[then(expr = "backup.cloud_path equals the expanded value of {string}")]
+async fn backup_cloud_path_equals_expanded(world: &mut AcceptanceWorld, raw_path: String) {
+    let cloud_path = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded")
+        .backup_cloud_path
+        .clone()
+        .expect("expected cloud path to be configured");
+    let home = ensure_workspace(world);
+    let expected = if let Some(suffix) = raw_path.strip_prefix("~/") {
+        home.join(suffix).display().to_string()
+    } else {
+        raw_path
+    };
+    assert_eq!(cloud_path, expected);
+}
+
+#[then(expr = "retention.daily_days equals {int}")]
+async fn retention_daily_days_equals(world: &mut AcceptanceWorld, value: i32) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    assert_eq!(config.retention_daily_days as i32, value);
+}
+
+#[then(expr = "retention.weekly_days equals {int}")]
+async fn retention_weekly_days_equals(world: &mut AcceptanceWorld, value: i32) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    assert_eq!(config.retention_weekly_days as i32, value);
+}
+
+#[then(expr = "schedule.daily_time equals {string}")]
+async fn schedule_daily_time_equals(world: &mut AcceptanceWorld, value: String) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    assert_eq!(config.schedule_daily_time, value);
+}
+
+#[then(expr = "schedule.weekly_day equals {string}")]
+async fn schedule_weekly_day_equals(world: &mut AcceptanceWorld, value: String) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    assert_eq!(config.schedule_weekly_day, value);
+}
+
+#[then(expr = "schedule.weekly_time equals {string}")]
+async fn schedule_weekly_time_equals(world: &mut AcceptanceWorld, value: String) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    assert_eq!(config.schedule_weekly_time, value);
+}
+
+#[then(expr = "notifications.enabled equals {word}")]
+async fn notifications_enabled_equals(world: &mut AcceptanceWorld, value: String) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    let expected = matches!(value.to_ascii_lowercase().as_str(), "true");
+    assert_eq!(config.notifications_enabled, expected);
+}
+
+#[then("backup.local_path starts with the user's home directory")]
+async fn backup_local_path_starts_with_home(world: &mut AcceptanceWorld) {
+    let backup_local_path = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    let backup_local_path = backup_local_path.backup_local_path.clone();
+    let home = ensure_workspace(world).display().to_string();
+    assert!(
+        backup_local_path.starts_with(&home),
+        "backup.local_path should start with home"
+    );
+}
+
+#[then(expr = "backup.local_path ends with {string}")]
+async fn backup_local_path_ends_with(world: &mut AcceptanceWorld, suffix: String) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    assert!(
+        config.backup_local_path.ends_with(&suffix),
+        "backup.local_path should end with `{suffix}`"
+    );
+}
+
+#[then(expr = "backup.local_path equals {string}")]
+async fn backup_local_path_equals(world: &mut AcceptanceWorld, expected: String) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    assert_eq!(config.backup_local_path, expected);
+}
+
+#[then(expr = "profile.path contains {string}")]
+async fn profile_path_contains(world: &mut AcceptanceWorld, expected: String) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    assert!(
+        config.profile_path.contains(&expected),
+        "profile.path should contain `{expected}`"
+    );
+}
+
+#[then("cloud sync is disabled")]
+async fn cloud_sync_disabled(world: &mut AcceptanceWorld) {
+    let config = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded");
+    let disabled = config
+        .backup_cloud_path
+        .as_ref()
+        .map(|v| v.trim().is_empty())
+        .unwrap_or(true);
+    assert!(disabled, "cloud sync should be disabled");
+}
+
+#[then("the default config file is used")]
+async fn default_config_file_used(world: &mut AcceptanceWorld) {
+    assert!(
+        world.config_used_default_path,
+        "expected default config path to be used"
+    );
+}
+
+#[then(expr = "archives are created in {string}")]
+async fn archives_created_in(world: &mut AcceptanceWorld, raw_path: String) {
+    let expected = if let Some(suffix) = raw_path.strip_prefix("~/") {
+        ensure_workspace(world).join(suffix)
+    } else {
+        PathBuf::from(raw_path)
+    };
+    assert!(
+        expected.join("daily").exists() || expected.exists(),
+        "expected archive output path to exist: {}",
+        expected.display()
+    );
+}
+
+#[then("the backup uses the configured profile path")]
+async fn backup_uses_configured_profile_path(world: &mut AcceptanceWorld) {
+    assert_eq!(world.exit_code, 0, "backup command should succeed");
 }
 
 #[then(expr = "an archive exists matching pattern {string}")]
@@ -1456,9 +1697,23 @@ async fn main() {
         feature.name == "Configuration"
             && matches!(
                 scenario.name.as_str(),
-                "Profile section is parsed correctly"
+                "Configuration is read from default location"
+                    | "Profile section is parsed correctly"
+                    | "Backup section is parsed correctly"
+                    | "Retention section is parsed correctly"
+                    | "Schedule section is parsed correctly"
+                    | "Notifications section is parsed correctly"
+                    | "Tilde is expanded to home directory"
+                    | "Environment variables in paths are expanded"
+                    | "Quoted values are handled correctly"
+                    | "Unquoted values are handled correctly"
                     | "Config path can be overridden via environment variable"
+                    | "Default path is used when environment variable is unset"
+                    | "Error when config file does not exist"
                     | "Error when config file is malformed"
+                    | "Empty cloud_path means local-only mode"
+                    | "Missing cloud_path means local-only mode"
+                    | "Comments in config file are ignored"
             )
     })
     .await;

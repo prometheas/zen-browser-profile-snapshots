@@ -112,10 +112,19 @@ pub fn load_config(required: bool, cwd: &Path) -> Result<Option<AppConfig>, Conf
     let schedule = parsed.schedule.unwrap_or_default();
     let notifications = parsed.notifications.unwrap_or_default();
 
+    let backup_cloud_path = backup.cloud_path.and_then(|value| {
+        let expanded = expand_path(&value, &config_path);
+        if expanded.trim().is_empty() {
+            None
+        } else {
+            Some(expanded)
+        }
+    });
+
     Ok(Some(AppConfig {
         profile_path: expand_path(&profile_path, &config_path),
         backup_local_path: expand_path(&backup_local_path, &config_path),
-        backup_cloud_path: backup.cloud_path,
+        backup_cloud_path,
         retention_daily_days: parsed
             .retention
             .as_ref()
@@ -135,13 +144,20 @@ pub fn load_config(required: bool, cwd: &Path) -> Result<Option<AppConfig>, Conf
 }
 
 fn expand_path(path: &str, config_path: &Path) -> String {
-    if let Some(rest) = path.strip_prefix("~/") {
+    if path.trim().is_empty() {
+        return String::new();
+    }
+    let expanded_env = expand_env_vars(path);
+    if let Some(rest) = expanded_env.strip_prefix("~/") {
         return PathBuf::from(resolve_home())
             .join(rest)
             .display()
             .to_string();
     }
-    let as_path = PathBuf::from(path);
+    if path_contains_env(path) {
+        return expanded_env;
+    }
+    let as_path = PathBuf::from(&expanded_env);
     if as_path.is_relative() {
         return config_path
             .parent()
@@ -150,7 +166,51 @@ fn expand_path(path: &str, config_path: &Path) -> String {
             .display()
             .to_string();
     }
-    path.to_string()
+    expanded_env
+}
+
+fn path_contains_env(path: &str) -> bool {
+    path.contains('$')
+}
+
+fn expand_env_vars(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    let chars: Vec<char> = path.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] != '$' {
+            out.push(chars[i]);
+            i += 1;
+            continue;
+        }
+        if i + 1 < chars.len() && chars[i + 1] == '{' {
+            let mut j = i + 2;
+            while j < chars.len() && chars[j] != '}' {
+                j += 1;
+            }
+            if j < chars.len() {
+                let key: String = chars[i + 2..j].iter().collect();
+                let value = std::env::var(&key).unwrap_or_default();
+                out.push_str(&value);
+                i = j + 1;
+                continue;
+            }
+        }
+        let mut j = i + 1;
+        while j < chars.len() && (chars[j].is_ascii_alphanumeric() || chars[j] == '_') {
+            j += 1;
+        }
+        if j == i + 1 {
+            out.push('$');
+            i += 1;
+            continue;
+        }
+        let key: String = chars[i + 1..j].iter().collect();
+        let value = std::env::var(&key).unwrap_or_default();
+        out.push_str(&value);
+        i = j;
+    }
+    out
 }
 
 fn resolve_home() -> String {
