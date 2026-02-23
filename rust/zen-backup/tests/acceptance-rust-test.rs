@@ -238,6 +238,13 @@ async fn zen_browser_not_running(world: &mut AcceptanceWorld) {
     world.env.remove("ZEN_BACKUP_BROWSER_RUNNING");
 }
 
+#[given("a Zen browser process is running")]
+async fn zen_browser_running(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_BROWSER_RUNNING".to_string(), "1".to_string());
+}
+
 #[given("the backup tool is installed")]
 async fn backup_tool_installed(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
@@ -270,11 +277,13 @@ async fn run_list(world: &mut AcceptanceWorld) {
 
 #[when("a daily backup is created")]
 async fn backup_daily(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
     run_command(world, "backup daily");
 }
 
 #[when("a weekly backup is created")]
 async fn backup_weekly(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
     run_command(world, "backup weekly");
 }
 
@@ -485,6 +494,39 @@ async fn stdout_lists(world: &mut AcceptanceWorld, value: String) {
     );
 }
 
+#[then(expr = "a macOS notification is displayed with title {string}")]
+async fn macos_notification_with_title(world: &mut AcceptanceWorld, title: String) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let path = backup_dir.join("notifications.log");
+    let content = fs::read_to_string(path).expect("expected notifications.log");
+    assert!(
+        content.contains(&title),
+        "expected notification title `{title}` in notifications log"
+    );
+}
+
+#[then(expr = "the notification contains {string}")]
+async fn notification_contains(world: &mut AcceptanceWorld, text: String) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let path = backup_dir.join("notifications.log");
+    let content = fs::read_to_string(path).expect("expected notifications.log");
+    assert!(
+        content.to_lowercase().contains(&text.to_lowercase()),
+        "expected notification text `{text}` in notifications log"
+    );
+}
+
+#[then("the backup completes successfully")]
+async fn backup_completes_successfully(world: &mut AcceptanceWorld) {
+    assert_eq!(world.exit_code, 0, "backup should complete successfully");
+}
+
 #[tokio::main]
 async fn main() {
     let list_feature =
@@ -536,6 +578,15 @@ async fn main() {
                     | "Schedule stop disables scheduled jobs without uninstalling"
                     | "Schedule start enables paused jobs"
             )
+    })
+    .await;
+
+    let notifications_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/features/platform/notifications.feature");
+    AcceptanceWorld::filter_run(notifications_feature, |feature, _, scenario| {
+        feature.name == "Notifications"
+            && scenario.name
+                == "Warning notification via terminal-notifier or osascript when browser is running"
     })
     .await;
 }
@@ -639,6 +690,23 @@ fn set_env_capture(key: &str, value: String, saved: &mut Vec<(String, Option<Str
     let previous = std::env::var(key).ok();
     saved.push((key.to_string(), previous));
     std::env::set_var(key, value);
+}
+
+fn ensure_backup_workspace(world: &mut AcceptanceWorld) {
+    if world.profile_dir.is_some() && world.backup_dir.is_some() {
+        return;
+    }
+    let workspace = ensure_workspace(world);
+    let profile_dir = workspace.join("profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create profile dir");
+    create_sqlite_db(&profile_dir.join("places.sqlite"));
+    world.profile_dir = Some(profile_dir.clone());
+
+    let backup_dir = workspace.join("backups");
+    fs::create_dir_all(&backup_dir).expect("failed to create backup dir");
+    world.backup_dir = Some(backup_dir.clone());
+
+    write_settings_for_profile(&workspace, &profile_dir, &backup_dir);
 }
 
 fn header_map(header: &[String]) -> HashMap<String, usize> {
