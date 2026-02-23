@@ -20,6 +20,7 @@ struct AcceptanceWorld {
     config_overrides: HashMap<String, String>,
     configured_missing_profile_path: Option<PathBuf>,
     profile_snapshot_before_restore: HashMap<String, Vec<u8>>,
+    cloud_backup_dir: Option<PathBuf>,
     stdout: String,
     stderr: String,
     exit_code: i32,
@@ -412,6 +413,28 @@ async fn configured_profile_path_missing(world: &mut AcceptanceWorld) {
         backup_dir.display()
     );
     fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+}
+
+#[given("cloud sync is configured to a valid path")]
+async fn cloud_sync_configured_valid_path(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    let workspace = ensure_workspace(world);
+    let cloud_dir = workspace.join("cloud-backups");
+    fs::create_dir_all(&cloud_dir).expect("failed to create cloud backup dir");
+    world.cloud_backup_dir = Some(cloud_dir.clone());
+    world.config_overrides.insert(
+        "backup.cloud_path".to_string(),
+        cloud_dir.display().to_string(),
+    );
+    rewrite_settings_from_world(world);
+}
+
+#[given("cloud sync is not configured")]
+async fn cloud_sync_not_configured(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    world.config_overrides.remove("backup.cloud_path");
+    world.cloud_backup_dir = None;
+    rewrite_settings_from_world(world);
 }
 
 #[when("the status command is run")]
@@ -839,6 +862,64 @@ async fn file_contains_line_matching(
     );
 }
 
+#[then(expr = "the archive exists in the local {string} subdirectory")]
+async fn archive_exists_in_local_subdirectory(world: &mut AcceptanceWorld, subdirectory: String) {
+    let archive = world
+        .last_archive
+        .clone()
+        .or_else(|| latest_archive_in_subdirectory(world, &subdirectory))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected local archive to be present (exit={} stdout=`{}` stderr=`{}`)",
+                world.exit_code, world.stdout, world.stderr
+            )
+        });
+    assert!(archive.exists(), "expected local archive to exist");
+    let parent = archive
+        .parent()
+        .and_then(|v| v.file_name())
+        .and_then(|v| v.to_str())
+        .unwrap_or_default();
+    assert_eq!(parent, subdirectory, "archive local subdirectory mismatch");
+}
+
+#[then(expr = "the archive exists in the cloud {string} subdirectory")]
+async fn archive_exists_in_cloud_subdirectory(world: &mut AcceptanceWorld, subdirectory: String) {
+    let cloud_dir = world
+        .cloud_backup_dir
+        .as_ref()
+        .expect("cloud backup dir should be configured");
+    let archive = world
+        .last_archive
+        .clone()
+        .or_else(|| latest_archive_in_subdirectory(world, &subdirectory))
+        .expect("expected local archive to determine cloud file name");
+    let file_name = archive
+        .file_name()
+        .and_then(|v| v.to_str())
+        .expect("archive file name should exist");
+    let cloud_archive = cloud_dir.join(subdirectory).join(file_name);
+    assert!(
+        cloud_archive.exists(),
+        "expected cloud archive to exist: {}",
+        cloud_archive.display()
+    );
+}
+
+#[then("no cloud copy is attempted")]
+async fn no_cloud_copy_attempted(world: &mut AcceptanceWorld) {
+    if let Some(cloud_dir) = &world.cloud_backup_dir {
+        if !cloud_dir.exists() {
+            return;
+        }
+        let has_any = fs::read_dir(cloud_dir)
+            .expect("failed to read cloud dir")
+            .filter_map(Result::ok)
+            .any(|entry| entry.path().is_file() || entry.path().is_dir());
+        assert!(!has_any, "expected no cloud copy artifacts");
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let list_feature =
@@ -872,6 +953,8 @@ async fn main() {
                     | "Create a weekly backup manually"
                     | "Warning logged when browser is running"
                     | "Error when profile directory does not exist"
+                    | "Backup is copied to cloud path when configured"
+                    | "No cloud copy when cloud sync is disabled"
             )
     })
     .await;
@@ -1140,14 +1223,36 @@ fn write_settings_for_profile(
 ) {
     let config_dir = workspace.join(".config/zen-profile-backup");
     fs::create_dir_all(&config_dir).expect("failed to create config dir");
+
+    let mut profile_path = profile_dir.display().to_string();
+    let mut backup_local_path = backup_dir.display().to_string();
+    let mut backup_cloud_path = None::<String>;
+    if let Some(value) = world.config_overrides.get("profile.path") {
+        profile_path = value.clone();
+    }
+    if let Some(value) = world.config_overrides.get("backup.local_path") {
+        backup_local_path = value.clone();
+    }
+    if let Some(value) = world.config_overrides.get("backup.cloud_path") {
+        backup_cloud_path = Some(value.clone());
+    }
+
     let mut config_body = format!(
         "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
-        profile_dir.display(),
-        backup_dir.display(),
+        profile_path, backup_local_path
     );
+    if let Some(cloud) = backup_cloud_path {
+        config_body.push_str(&format!("cloud_path = \"{}\"\n", cloud));
+    }
     if !world.config_overrides.is_empty() {
         let mut section_keys: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
         for (key, value) in &world.config_overrides {
+            if matches!(
+                key.as_str(),
+                "profile.path" | "backup.local_path" | "backup.cloud_path"
+            ) {
+                continue;
+            }
             let mut parts = key.splitn(2, '.');
             if let (Some(section), Some(field)) = (parts.next(), parts.next()) {
                 section_keys
@@ -1172,6 +1277,42 @@ fn write_settings_for_profile(
         }
     }
     fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+}
+
+fn rewrite_settings_from_world(world: &AcceptanceWorld) {
+    let workspace = world
+        .workspace
+        .as_ref()
+        .expect("workspace should be initialized")
+        .path()
+        .to_path_buf();
+    let profile_dir = world
+        .profile_dir
+        .as_ref()
+        .expect("profile dir should be configured")
+        .to_path_buf();
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured")
+        .to_path_buf();
+    write_settings_for_profile(world, &workspace, &profile_dir, &backup_dir);
+}
+
+fn latest_archive_in_subdirectory(world: &AcceptanceWorld, subdirectory: &str) -> Option<PathBuf> {
+    let backup_dir = world.backup_dir.as_ref()?;
+    let directory = backup_dir.join(subdirectory);
+    if !directory.exists() {
+        return None;
+    }
+    let mut archives: Vec<PathBuf> = fs::read_dir(directory)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().map(|ext| ext == "gz").unwrap_or(false))
+        .collect();
+    archives.sort();
+    archives.pop()
 }
 
 fn capture_profile_snapshot(world: &mut AcceptanceWorld) {
