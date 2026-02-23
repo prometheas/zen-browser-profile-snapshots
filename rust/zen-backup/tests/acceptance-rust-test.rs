@@ -548,6 +548,30 @@ async fn stdout_contains_either(world: &mut AcceptanceWorld, left: String, right
     );
 }
 
+#[then(expr = "stdout contains {string} or a size indicator")]
+async fn stdout_contains_or_size_indicator(world: &mut AcceptanceWorld, left: String) {
+    let has_size = regex::Regex::new(r"\b\d+(\.\d+)?\s?(B|KB|MB|GB)\b")
+        .expect("invalid size regex")
+        .is_match(&world.stdout);
+    assert!(
+        world.stdout.contains(&left) || has_size,
+        "expected stdout to contain `{left}` or a size indicator, got `{}`",
+        world.stdout
+    );
+}
+
+#[then(expr = "stdout contains {string} or a date indicator")]
+async fn stdout_contains_or_date_indicator(world: &mut AcceptanceWorld, left: String) {
+    let has_date = regex::Regex::new(r"\b\d{4}-\d{2}-\d{2}\b")
+        .expect("invalid date regex")
+        .is_match(&world.stdout);
+    assert!(
+        world.stdout.contains(&left) || has_date,
+        "expected stdout to contain `{left}` or a date indicator, got `{}`",
+        world.stdout
+    );
+}
+
 #[then(expr = "stderr contains {string} or {string}")]
 async fn stderr_contains_either(world: &mut AcceptanceWorld, left: String, right: String) {
     assert!(
@@ -939,7 +963,12 @@ async fn main() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/features/status.feature");
     AcceptanceWorld::filter_run(status_feature, |feature, _, scenario| {
         feature.name == "Status"
-            && scenario.name == "Status shows \"Not installed\" when settings.toml is missing"
+            && matches!(
+                scenario.name.as_str(),
+                "Status shows \"Not installed\" when settings.toml is missing"
+                    | "Status shows most recent daily backup"
+                    | "Status shows most recent weekly backup"
+            )
     })
     .await;
 
