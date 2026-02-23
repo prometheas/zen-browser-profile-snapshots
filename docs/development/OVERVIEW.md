@@ -26,7 +26,7 @@ This document is the entry point for contributor and agent-facing development wo
 - Script file names under `scripts/` stay lower-kebab-case.
 - For scripts that implement a colon task family, map `:` to `--`:
   - example task family: `test:acceptance:*`
-  - script: `scripts/task--test-acceptance.ts`
+  - script: `scripts/task--test-acceptance--rust.ts`
 
 ## Testing
 
@@ -48,13 +48,12 @@ Runtime parity tracking:
   - `deno task test:integration`
 - Acceptance:
   - `deno task test:acceptance`
+  - `deno task test:acceptance:rust`
   - `deno task test:acceptance:platform`
   - `deno task test:acceptance:platform:macos`
   - `deno task test:acceptance:platform:linux`
   - `deno task test:acceptance:platform:windows`
   - `deno task test:acceptance:m1`
-  - Focused feedback acceptance:
-    - `deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts docs/features/core/feedback.feature`
 - Release build tasks:
   - `deno task release:macos`
   - `deno task release:linux`

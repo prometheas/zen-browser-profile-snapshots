@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1.0.19";
-import { buildScenarioEnv } from "../acceptance/support/world-env.ts";
+import { buildScenarioEnv } from "../support/world-env.ts";
 
 Deno.test("buildScenarioEnv keeps ZEN_BACKUP_* values and resets unrelated vars", () => {
   const env = buildScenarioEnv(

@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1.0.19";
-import { platformEnvFromTags } from "../acceptance/support/platform-env.ts";
+import { platformEnvFromTags } from "../support/platform-env.ts";
 
 Deno.test("platformEnvFromTags returns windows simulation flags for @windows", () => {
   assertEquals(platformEnvFromTags(["@windows"]), {

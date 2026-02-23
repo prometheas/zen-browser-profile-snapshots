@@ -12,10 +12,10 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - location: `tests/integration/`
   - purpose: command behavior across filesystem/config/platform adapters
   - validates realistic workflows in temporary sandboxes
-- Acceptance tests (Gherkin + Cucumber):
+- Acceptance tests (Gherkin + cucumber-rs):
   - features: `docs/features/**/*.feature`
-  - step definitions: `tests/acceptance/steps/`
-  - support/world: `tests/acceptance/support/`
+  - rust harness: `rust/zen-backup/tests/acceptance-rust-test.rs`
+  - runner wrapper: `scripts/task--test-acceptance--rust.ts`
   - purpose: user-story and scenario-level behavior verification
 
 ## When to Add Which Test
@@ -43,10 +43,8 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - `deno task test:integration`
 - Acceptance (all):
   - `deno task test:acceptance`
-- Acceptance (rust harness smoke):
+- Acceptance (explicit rust alias):
   - `deno task test:acceptance:rust`
-  - feedback-only:
-    - `deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts docs/features/core/feedback.feature`
 - Acceptance (platform):
   - `deno task test:acceptance:platform`
   - `deno task test:acceptance:platform:macos`
@@ -82,8 +80,9 @@ Use this guide when creating tests, choosing test scope, and running validation.
 
 ## Acceptance Runtime Notes
 
-- Acceptance execution is wrapped by `scripts/task--test-acceptance.ts`.
-- Rust acceptance smoke execution is wrapped by `scripts/task--test-acceptance--rust.ts`.
+- Acceptance execution is wrapped by `scripts/task--test-acceptance--rust.ts`.
+- `test:acceptance`, `test:acceptance:m1`, and platform-tagged acceptance tasks are aliases to the
+  rust acceptance suite.
 - Do not copy long raw Cucumber commands unless debugging task-wrapper behavior.
 - If a scenario timing issue occurs, adjust step timeout intentionally and keep it scoped.
 
