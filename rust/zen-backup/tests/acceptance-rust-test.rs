@@ -899,6 +899,19 @@ async fn main() {
             )
     })
     .await;
+
+    let configuration_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/features/core/configuration.feature");
+    AcceptanceWorld::filter_run(configuration_feature, |feature, _, scenario| {
+        feature.name == "Configuration"
+            && matches!(
+                scenario.name.as_str(),
+                "Profile section is parsed correctly"
+                    | "Config path can be overridden via environment variable"
+                    | "Error when config file is malformed"
+            )
+    })
+    .await;
 }
 
 fn resolve_cli_path() -> PathBuf {

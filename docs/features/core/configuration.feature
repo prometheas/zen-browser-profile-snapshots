@@ -10,7 +10,7 @@ Feature: Configuration
       | platform | path                                          |
       | macos    | ~/.config/zen-profile-backup/settings.toml    |
       | linux    | ~/.config/zen-profile-backup/settings.toml    |
-      | windows  | %APPDATA%\zen-profile-backup\settings.toml    |
+      | windows  | %APPDATA%\\zen-profile-backup\\settings.toml  |
     And the config file contains:
       """
       [profile]
