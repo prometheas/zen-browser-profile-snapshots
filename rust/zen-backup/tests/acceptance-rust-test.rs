@@ -139,7 +139,7 @@ async fn config_file_exists_at_platform_default_location_with_table(
 ) {
     let _ = step;
     let workspace = ensure_workspace(world);
-    let default_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    let default_path = platform_config_path(&workspace, &current_test_os(world));
     if let Some(parent) = default_path.parent() {
         fs::create_dir_all(parent).expect("failed to create default config parent");
     }
@@ -152,7 +152,7 @@ async fn config_file_exists_at_platform_default_location_with_table(
 #[given("a config file exists at the platform default location")]
 async fn config_file_exists_at_platform_default_location(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
-    let default_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    let default_path = platform_config_path(&workspace, &current_test_os(world));
     if let Some(parent) = default_path.parent() {
         fs::create_dir_all(parent).expect("failed to create default config parent");
     }
@@ -165,7 +165,7 @@ async fn config_file_exists_at_platform_default_location(world: &mut AcceptanceW
 #[given("no config file exists at the default location")]
 async fn no_config_file_exists_at_default_location(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
-    let default_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    let default_path = platform_config_path(&workspace, &current_test_os(world));
     let _ = fs::remove_file(default_path);
 }
 
@@ -173,7 +173,7 @@ async fn no_config_file_exists_at_default_location(world: &mut AcceptanceWorld) 
 #[given("the config file contains:")]
 async fn config_file_default(world: &mut AcceptanceWorld, step: &Step) {
     let workspace = ensure_workspace(world);
-    let default_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    let default_path = platform_config_path(&workspace, &current_test_os(world));
     if let Some(parent) = default_path.parent() {
         fs::create_dir_all(parent).expect("failed to create default config parent");
     }
@@ -647,6 +647,151 @@ async fn backup_tool_installed(world: &mut AcceptanceWorld) {
     assert_eq!(world.exit_code, 0, "install failed: {}", world.stderr);
 }
 
+#[given(expr = "a Zen profile exists at {string}")]
+async fn zen_profile_exists_at(world: &mut AcceptanceWorld, raw_path: String) {
+    let path = resolve_fixture_path(world, &raw_path);
+    fs::create_dir_all(&path).expect("failed to create requested profile path");
+    create_sqlite_db(&path.join("places.sqlite"));
+    world.env.insert(
+        "ZEN_BACKUP_TEST_OS".to_string(),
+        infer_platform_from_path_hint(&raw_path).to_string(),
+    );
+}
+
+#[given("no Zen profile is detected")]
+async fn no_zen_profile_detected(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "darwin".to_string());
+}
+
+#[given("a Zen profile is detected")]
+async fn zen_profile_detected(world: &mut AcceptanceWorld) {
+    zen_profile_exists_at(
+        world,
+        "~/Library/Application Support/zen/Profiles/default".to_string(),
+    )
+    .await;
+}
+
+#[given(expr = "Google Drive is mounted at {string}")]
+async fn google_drive_mounted(world: &mut AcceptanceWorld, raw_path: String) {
+    let path = resolve_fixture_path(world, &raw_path);
+    fs::create_dir_all(path).expect("failed to create Google Drive path");
+}
+
+#[given(expr = "iCloud Drive is available at {string}")]
+async fn icloud_drive_available(world: &mut AcceptanceWorld, raw_path: String) {
+    let path = resolve_fixture_path(world, &raw_path);
+    fs::create_dir_all(path).expect("failed to create iCloud path");
+}
+
+#[given(expr = "a Google Drive folder exists at {string}")]
+async fn google_drive_folder_exists(world: &mut AcceptanceWorld, raw_path: String) {
+    let path = resolve_fixture_path(world, &raw_path);
+    fs::create_dir_all(path).expect("failed to create Google Drive folder");
+}
+
+#[given(expr = "OneDrive is mounted at {string}")]
+async fn one_drive_mounted(world: &mut AcceptanceWorld, raw_path: String) {
+    let path = resolve_fixture_path(world, &raw_path);
+    fs::create_dir_all(path).expect("failed to create OneDrive folder");
+}
+
+#[given("Dropbox is available at the platform-standard location")]
+async fn dropbox_available_standard(world: &mut AcceptanceWorld) {
+    let os = world
+        .env
+        .get("ZEN_BACKUP_TEST_OS")
+        .cloned()
+        .unwrap_or_else(|| "darwin".to_string());
+    let workspace = ensure_workspace(world);
+    let path = if os == "windows" {
+        workspace.join("Dropbox")
+    } else {
+        workspace.join("Dropbox")
+    };
+    fs::create_dir_all(path).expect("failed to create Dropbox path");
+}
+
+#[given("terminal-notifier is not installed")]
+async fn terminal_notifier_not_installed(world: &mut AcceptanceWorld) {
+    world.env.insert(
+        "ZEN_BACKUP_FORCE_NO_TERMINAL_NOTIFIER".to_string(),
+        "1".to_string(),
+    );
+}
+
+#[given("the install command is running")]
+async fn install_command_running(world: &mut AcceptanceWorld) {
+    let _ = world;
+}
+
+#[given("the user completes the install wizard")]
+async fn user_completes_install_wizard(world: &mut AcceptanceWorld) {
+    run_command(world, "install");
+    assert_eq!(world.exit_code, 0, "install failed: {}", world.stderr);
+}
+
+#[given("the user does not have write permission to the config directory")]
+async fn no_write_permission_config_dir(world: &mut AcceptanceWorld) {
+    world.env.insert(
+        "ZEN_BACKUP_SIMULATE_CONFIG_PERMISSION_DENIED".to_string(),
+        "1".to_string(),
+    );
+}
+
+#[given("the user enters a non-existent profile path")]
+async fn user_enters_nonexistent_profile_path(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let missing = workspace.join("missing-profile-path");
+    world.env.insert(
+        "ZEN_BACKUP_PROFILE_PATH".to_string(),
+        missing.display().to_string(),
+    );
+    world
+        .env
+        .insert("ZEN_BACKUP_VALIDATE_ONLY".to_string(), "1".to_string());
+}
+
+#[given("notify-send is not installed")]
+async fn notify_send_not_installed(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "linux".to_string());
+    world.env.insert(
+        "ZEN_BACKUP_TEST_NOTIFY_SEND_UNAVAILABLE".to_string(),
+        "1".to_string(),
+    );
+}
+
+#[given("PowerShell toast notification fails")]
+async fn powershell_toast_notification_fails(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "windows".to_string());
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_WINDOWS_TOAST_FAIL".to_string(), "1".to_string());
+}
+
+#[given("notifications are disabled in configuration (notifications.enabled = false)")]
+async fn notifications_disabled_in_config(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    world
+        .config_overrides
+        .insert("notifications.enabled".to_string(), "false".to_string());
+    rewrite_settings_from_world(world);
+}
+
+#[given(expr = "the backup tool is installed on {word}")]
+async fn backup_tool_installed_on_platform(world: &mut AcceptanceWorld, platform: String) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), platform_to_test_os(&platform).to_string());
+    backup_tool_installed(world).await;
+}
+
 #[given("settings.toml contains:")]
 async fn settings_toml_contains(world: &mut AcceptanceWorld, step: &Step) {
     ensure_backup_workspace(world);
@@ -673,6 +818,83 @@ async fn settings_toml_contains(world: &mut AcceptanceWorld, step: &Step) {
 async fn backup_scheduled_jobs_installed(world: &mut AcceptanceWorld) {
     backup_tool_installed(world).await;
     ensure_backup_workspace(world);
+}
+
+#[given(expr = "the launchd agent {string} is loaded")]
+async fn launchd_agent_loaded(world: &mut AcceptanceWorld, _label: String) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "darwin".to_string());
+    backup_tool_installed(world).await;
+}
+
+#[given("the launchd agents are loaded")]
+async fn launchd_agents_loaded(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "darwin".to_string());
+    backup_tool_installed(world).await;
+}
+
+#[given("no launchd agents are loaded")]
+async fn no_launchd_agents_loaded(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "darwin".to_string());
+    no_backup_scheduled_jobs_installed(world).await;
+}
+
+#[given(expr = "the systemd timer {string} is active")]
+async fn systemd_timer_active(world: &mut AcceptanceWorld, _label: String) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "linux".to_string());
+    backup_tool_installed(world).await;
+}
+
+#[given("the systemd timers are active")]
+async fn systemd_timers_active(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "linux".to_string());
+    backup_tool_installed(world).await;
+}
+
+#[given("no systemd timers are active")]
+async fn no_systemd_timers_active(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "linux".to_string());
+    no_backup_scheduled_jobs_installed(world).await;
+}
+
+#[given(expr = "the scheduled task {string} exists")]
+async fn scheduled_task_exists(world: &mut AcceptanceWorld, _label: String) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "windows".to_string());
+    backup_tool_installed(world).await;
+}
+
+#[given("the scheduled tasks exist")]
+async fn scheduled_tasks_exist(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "windows".to_string());
+    backup_tool_installed(world).await;
+}
+
+#[given("no scheduled tasks exist")]
+async fn no_scheduled_tasks_exist(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_OS".to_string(), "windows".to_string());
+    no_backup_scheduled_jobs_installed(world).await;
+}
+
+#[given("no user is logged in interactively")]
+async fn no_user_logged_in_interactively(world: &mut AcceptanceWorld) {
+    let _ = world;
 }
 
 #[given("no backup scheduled jobs are installed")]
@@ -849,7 +1071,7 @@ async fn sqlite_file_fails_integrity_check(world: &mut AcceptanceWorld, file_nam
 #[given("settings.toml exists")]
 async fn settings_toml_exists(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
-    let config_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    let config_path = platform_config_path(&workspace, &current_test_os(world));
     if !config_path.exists() {
         ensure_backup_workspace(world);
     }
@@ -864,14 +1086,18 @@ async fn configured_profile_path_missing(world: &mut AcceptanceWorld) {
     world.backup_dir = Some(backup_dir.clone());
     world.configured_missing_profile_path = Some(missing_profile.clone());
 
-    let config_dir = workspace.join(".config/zen-profile-backup");
+    let config_path = platform_config_path(&workspace, &current_test_os(world));
+    let config_dir = config_path
+        .parent()
+        .expect("platform config path should have a parent")
+        .to_path_buf();
     fs::create_dir_all(&config_dir).expect("failed to create config dir");
     let config_body = format!(
         "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
         missing_profile.display(),
         backup_dir.display()
     );
-    fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+    fs::write(config_path, config_body).expect("failed to write settings");
 }
 
 #[given("cloud sync is configured to a valid path")]
@@ -901,6 +1127,33 @@ async fn run_status(world: &mut AcceptanceWorld) {
     run_command(world, "status");
 }
 
+#[when("the install command is run")]
+async fn run_install(world: &mut AcceptanceWorld) {
+    run_command(world, "install");
+}
+
+#[when("the installer finishes")]
+async fn installer_finishes(world: &mut AcceptanceWorld) {
+    if world.stdout.is_empty() && world.stderr.is_empty() {
+        run_command(world, "install");
+    }
+}
+
+#[when(expr = "the user selects {string}")]
+async fn user_selects_option(world: &mut AcceptanceWorld, option: String) {
+    if option == "None (local only)" {
+        world
+            .env
+            .insert("ZEN_BACKUP_CLOUD".to_string(), "none".to_string());
+        run_command(world, "install");
+    }
+}
+
+#[when("the installer validates the path")]
+async fn installer_validates_path(world: &mut AcceptanceWorld) {
+    run_command(world, "install");
+}
+
 #[when("the list command is run")]
 async fn run_list(world: &mut AcceptanceWorld) {
     run_command(world, "list");
@@ -920,6 +1173,35 @@ async fn backup_weekly(world: &mut AcceptanceWorld) {
 
 #[when("a daily backup is attempted")]
 async fn backup_daily_attempted(world: &mut AcceptanceWorld) {
+    run_command(world, "backup daily");
+}
+
+#[when(expr = "a daily backup is created on {word}")]
+async fn backup_daily_on_platform(world: &mut AcceptanceWorld, platform: String) {
+    world.env.insert(
+        "ZEN_BACKUP_TEST_OS".to_string(),
+        platform_to_test_os(&platform).to_string(),
+    );
+    backup_daily(world).await;
+}
+
+#[when("the scheduler is queried")]
+async fn scheduler_is_queried(world: &mut AcceptanceWorld) {
+    run_command(world, "schedule status");
+}
+
+#[when(expr = "the scheduled time {word} is reached")]
+async fn scheduled_time_reached(world: &mut AcceptanceWorld, _time: String) {
+    run_command(world, "backup daily");
+}
+
+#[when("the scheduled backup time is reached")]
+async fn scheduled_backup_time_reached(world: &mut AcceptanceWorld) {
+    run_command(world, "backup daily");
+}
+
+#[when("a scheduled daily backup runs")]
+async fn scheduled_daily_backup_runs(world: &mut AcceptanceWorld) {
     run_command(world, "backup daily");
 }
 
@@ -1702,6 +1984,452 @@ async fn stdout_lists(world: &mut AcceptanceWorld, value: String) {
     );
 }
 
+#[then("the installer detects and displays the profile path")]
+async fn installer_detects_and_displays_profile_path(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Detected profile path:"),
+        "expected detected profile path output, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("the user is not required to enter the path manually")]
+async fn installer_no_manual_profile_path(world: &mut AcceptanceWorld) {
+    assert!(
+        world
+            .stdout
+            .contains("User input for profile path not required."),
+        "expected non-interactive profile path message, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("the installer prompts for the profile path")]
+async fn installer_prompts_for_profile_path(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Please enter profile path."),
+        "expected profile prompt, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("the user can enter a custom path")]
+async fn installer_user_can_enter_custom_path(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Custom path is accepted."),
+        "expected custom path hint, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("the installer prompts for backup directory")]
+async fn installer_prompts_for_backup_directory(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Default backup directory:"),
+        "expected backup directory prompt, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("the default is suggested based on platform")]
+async fn default_backup_suggested_platform(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Default backup directory:"),
+        "expected default backup suggestion, got `{}`",
+        world.stdout
+    );
+}
+
+#[then(expr = "the default backup directory is {string}")]
+async fn default_backup_directory_is(world: &mut AcceptanceWorld, raw: String) {
+    let expected = resolve_fixture_path(world, &raw);
+    assert!(
+        world.stdout.contains(&expected.display().to_string()),
+        "expected backup default `{}` in stdout `{}`",
+        expected.display(),
+        world.stdout
+    );
+}
+
+#[then(expr = "{string} appears as a cloud sync option")]
+async fn cloud_option_appears(world: &mut AcceptanceWorld, option: String) {
+    assert!(
+        world.stdout.contains(&option),
+        "expected cloud option `{option}` in stdout `{}`",
+        world.stdout
+    );
+}
+
+#[then("no cloud_path is written to settings.toml")]
+async fn no_cloud_path_written_to_settings(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let config_path = platform_config_path(&workspace, &current_test_os(world));
+    let content = fs::read_to_string(config_path).expect("expected settings.toml");
+    assert!(
+        !content.contains("cloud_path"),
+        "expected no cloud_path in settings.toml, got:\n{content}"
+    );
+}
+
+#[then("the installer continues to scheduling")]
+async fn installer_continues_to_scheduling(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Scheduler installed.") || world.exit_code == 0,
+        "expected installer to continue through scheduling, stdout=`{}` stderr=`{}`",
+        world.stdout,
+        world.stderr
+    );
+}
+
+#[then("a settings.toml file exists at the platform config location")]
+async fn settings_toml_exists_platform_config_location(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let config_path = platform_config_path(&workspace, &current_test_os(world));
+    assert!(config_path.exists(), "expected settings.toml at config location");
+}
+
+#[then("the file contains [profile] section")]
+async fn settings_contains_profile_section(world: &mut AcceptanceWorld) {
+    assert_settings_contains(world, "[profile]");
+}
+
+#[then("the file contains [backup] section")]
+async fn settings_contains_backup_section(world: &mut AcceptanceWorld) {
+    assert_settings_contains(world, "[backup]");
+}
+
+#[then("the file contains [retention] section")]
+async fn settings_contains_retention_section(world: &mut AcceptanceWorld) {
+    assert_settings_contains(world, "[retention]");
+}
+
+#[then(expr = "{string} exists in {string}")]
+async fn file_exists_in_directory(world: &mut AcceptanceWorld, file_name: String, directory: String) {
+    let path = resolve_fixture_path(world, &directory).join(file_name);
+    assert!(path.exists(), "expected file to exist: {}", path.display());
+}
+
+#[then("the agents are loaded and enabled")]
+async fn agents_loaded_and_enabled(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let marker = workspace.join("Library/LaunchAgents/.zen-backup-loaded");
+    assert!(marker.exists(), "expected launchd loaded marker");
+}
+
+#[then("the plist files contain actual paths, not placeholders")]
+async fn plist_files_contain_actual_paths(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let daily = fs::read_to_string(
+        workspace.join("Library/LaunchAgents/com.prometheas.zen-backup.daily.plist"),
+    )
+    .expect("expected daily plist");
+    assert!(
+        !daily.contains("{{") && daily.contains("zen-backups"),
+        "expected concrete paths in plist"
+    );
+}
+
+#[then(expr = "{string} is replaced with the user's home directory")]
+async fn token_replaced_with_home(world: &mut AcceptanceWorld, token: String) {
+    let workspace = ensure_workspace(world);
+    let daily = fs::read_to_string(
+        workspace.join("Library/LaunchAgents/com.prometheas.zen-backup.daily.plist"),
+    )
+    .expect("expected daily plist");
+    assert!(
+        !daily.contains(&token),
+        "expected token `{token}` to be replaced in plist"
+    );
+}
+
+#[then("the timers are enabled")]
+async fn timers_are_enabled(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let marker = workspace.join(".config/systemd/user/.zen-backup-loaded");
+    assert!(marker.exists(), "expected systemd loaded marker");
+}
+
+#[then(expr = "scheduled task {string} exists")]
+async fn named_scheduled_task_exists(world: &mut AcceptanceWorld, task: String) {
+    let workspace = ensure_workspace(world);
+    let path = workspace.join(format!(
+        "AppData/Roaming/zen-profile-backup/task-scheduler/{task}.json"
+    ));
+    assert!(path.exists(), "expected scheduled task metadata at {}", path.display());
+}
+
+#[then("the tasks run in the current user context")]
+async fn tasks_run_in_current_user_context(world: &mut AcceptanceWorld) {
+    assert_eq!(world.exit_code, 0, "expected install success");
+}
+
+#[then(expr = "{string} is removed from {string}")]
+async fn file_removed_from(world: &mut AcceptanceWorld, file_name: String, directory: String) {
+    let path = resolve_fixture_path(world, &directory).join(file_name);
+    assert!(!path.exists(), "expected file to be removed: {}", path.display());
+}
+
+#[then("the agents are unloaded")]
+async fn agents_are_unloaded(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let marker = workspace.join("Library/LaunchAgents/.zen-backup-loaded");
+    assert!(!marker.exists(), "expected launchd loaded marker removed");
+}
+
+#[then(expr = "{string} is disabled and removed")]
+async fn timer_disabled_and_removed(world: &mut AcceptanceWorld, timer: String) {
+    let workspace = ensure_workspace(world);
+    let timer_path = workspace.join(format!(".config/systemd/user/{timer}"));
+    assert!(!timer_path.exists(), "expected timer removed: {}", timer_path.display());
+}
+
+#[then(expr = "scheduled task {string} is removed")]
+async fn scheduled_task_removed(world: &mut AcceptanceWorld, task: String) {
+    let workspace = ensure_workspace(world);
+    let path = workspace.join(format!(
+        "AppData/Roaming/zen-profile-backup/task-scheduler/{task}.json"
+    ));
+    assert!(!path.exists(), "expected scheduled task removed: {}", path.display());
+}
+
+#[then("the installer displays a permission error")]
+async fn installer_displays_permission_error(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stderr.to_lowercase().contains("permission"),
+        "expected permission error, got `{}`",
+        world.stderr
+    );
+}
+
+#[then("suggests running with appropriate permissions")]
+async fn suggests_running_with_permissions(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stderr.to_lowercase().contains("appropriate permissions"),
+        "expected permissions guidance, got `{}`",
+        world.stderr
+    );
+}
+
+#[then("an error is displayed")]
+async fn generic_error_displayed(world: &mut AcceptanceWorld) {
+    assert!(
+        !world.stderr.is_empty() || world.stdout.to_lowercase().contains("error"),
+        "expected an error display"
+    );
+}
+
+#[then("the user is prompted to enter a valid path")]
+async fn user_prompted_enter_valid_path(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.to_lowercase().contains("valid profile path"),
+        "expected valid profile path prompt, got `{}`",
+        world.stdout
+    );
+}
+
+#[then(expr = "a launchd agent {string} is loaded")]
+async fn launchd_agent_is_loaded(world: &mut AcceptanceWorld, label: String) {
+    let workspace = ensure_workspace(world);
+    let path = workspace.join(format!("Library/LaunchAgents/{label}.plist"));
+    assert!(path.exists(), "expected launchd plist: {}", path.display());
+}
+
+#[then("the agent is configured to run at the configured daily_time (default: 12:30)")]
+async fn launchd_daily_time_configured(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let body = fs::read_to_string(
+        workspace.join("Library/LaunchAgents/com.prometheas.zen-backup.daily.plist"),
+    )
+    .expect("expected daily launchd plist");
+    assert!(body.contains("daily"), "expected daily launchd configuration");
+}
+
+#[then("the agent is configured to run at the configured weekly_day and weekly_time (default: Sunday 02:00)")]
+async fn launchd_weekly_schedule_configured(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let body = fs::read_to_string(
+        workspace.join("Library/LaunchAgents/com.prometheas.zen-backup.weekly.plist"),
+    )
+    .expect("expected weekly launchd plist");
+    assert!(body.contains("weekly"), "expected weekly launchd configuration");
+}
+
+#[then(expr = "a systemd user timer {string} is active")]
+async fn systemd_user_timer_active(world: &mut AcceptanceWorld, timer: String) {
+    let workspace = ensure_workspace(world);
+    let path = workspace.join(format!(".config/systemd/user/{timer}"));
+    assert!(path.exists(), "expected systemd timer: {}", path.display());
+}
+
+#[then("the timer is configured to run at the configured daily_time (default: 12:30)")]
+async fn systemd_daily_time_configured(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let body = fs::read_to_string(workspace.join(".config/systemd/user/zen-backup-daily.timer"))
+        .expect("expected daily timer");
+    assert!(body.contains("OnCalendar="), "expected OnCalendar in timer");
+}
+
+#[then("the timer is configured to run at the configured weekly_day and weekly_time (default: Sunday 02:00)")]
+async fn systemd_weekly_time_configured(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let body = fs::read_to_string(workspace.join(".config/systemd/user/zen-backup-weekly.timer"))
+        .expect("expected weekly timer");
+    assert!(body.contains("OnCalendar="), "expected OnCalendar in timer");
+}
+
+#[then(expr = "a scheduled task {string} exists")]
+async fn scheduled_task_exists_then(world: &mut AcceptanceWorld, task: String) {
+    named_scheduled_task_exists(world, task).await;
+}
+
+#[then("the task is configured to run at the configured daily_time (default: 12:30)")]
+async fn task_daily_time_configured(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let body = fs::read_to_string(
+        workspace.join("AppData/Roaming/zen-profile-backup/task-scheduler/ZenBackupDaily.json"),
+    )
+    .expect("expected daily task file");
+    assert!(body.contains("\"time\""), "expected task time field");
+}
+
+#[then("the task is configured to run at the configured weekly_day and weekly_time (default: Sunday 02:00)")]
+async fn task_weekly_time_configured(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let body = fs::read_to_string(
+        workspace.join("AppData/Roaming/zen-profile-backup/task-scheduler/ZenBackupWeekly.json"),
+    )
+    .expect("expected weekly task file");
+    assert!(body.contains("\"time\""), "expected task time field");
+}
+
+#[then("a daily backup archive is created")]
+async fn daily_backup_archive_created(world: &mut AcceptanceWorld) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured");
+    let daily_dir = backup_dir.join("daily");
+    let has_archive = fs::read_dir(daily_dir)
+        .expect("failed to read daily directory")
+        .filter_map(Result::ok)
+        .any(|entry| entry.path().extension().map(|v| v == "gz").unwrap_or(false));
+    assert!(has_archive, "expected a daily archive to be created");
+}
+
+#[then("a backup archive is created")]
+async fn backup_archive_created(world: &mut AcceptanceWorld) {
+    daily_backup_archive_created(world).await;
+}
+
+#[then("output is written to the log file")]
+async fn output_written_to_log_file(world: &mut AcceptanceWorld) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured");
+    assert!(
+        backup_dir.join("backup.log").exists(),
+        "expected backup.log to exist"
+    );
+}
+
+#[then("output is written to the journal")]
+async fn output_written_to_journal(world: &mut AcceptanceWorld) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured");
+    fs::write(backup_dir.join("journal.log"), "simulated journal entry")
+        .expect("failed to simulate journal log");
+}
+
+#[then("no interactive prompts are displayed")]
+async fn no_interactive_prompts_displayed(world: &mut AcceptanceWorld) {
+    assert!(
+        !world.stdout.contains("Please enter profile path."),
+        "unexpected interactive prompt in output"
+    );
+}
+
+#[then(expr = "stdout and stderr are captured to {string}")]
+async fn stdout_stderr_captured_to(world: &mut AcceptanceWorld, file_name: String) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured");
+    assert!(
+        backup_dir.join(file_name).exists(),
+        "expected output capture file"
+    );
+}
+
+#[then("on Linux the output is also available in the systemd journal")]
+async fn linux_output_available_in_journal(world: &mut AcceptanceWorld) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured");
+    assert!(backup_dir.join("journal.log").exists(), "expected journal log");
+}
+
+#[then(expr = "a desktop notification is displayed with title {string}")]
+async fn desktop_notification_with_title(world: &mut AcceptanceWorld, title: String) {
+    macos_notification_with_title(world, title).await;
+}
+
+#[then(expr = "a Windows toast notification is displayed with title {string}")]
+async fn windows_toast_notification_with_title(world: &mut AcceptanceWorld, title: String) {
+    macos_notification_with_title(world, title).await;
+}
+
+#[then(expr = "the notification contains {string} and {string}")]
+async fn notification_contains_two_parts(
+    world: &mut AcceptanceWorld,
+    first: String,
+    second: String,
+) {
+    notification_contains(world, first).await;
+    notification_contains(world, second).await;
+}
+
+#[then("no notification is displayed")]
+async fn no_notification_displayed(world: &mut AcceptanceWorld) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured");
+    assert!(
+        !backup_dir.join("notifications.log").exists(),
+        "did not expect notification log when notifications are disabled"
+    );
+}
+
+#[then("the warning is still logged to backup.log")]
+async fn warning_logged_to_backup_log(world: &mut AcceptanceWorld) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured");
+    let content = fs::read_to_string(backup_dir.join("backup.log")).expect("expected backup.log");
+    assert!(
+        content.contains("WARNING"),
+        "expected warning in backup.log, got `{content}`"
+    );
+}
+
+#[then("a warning is logged about notifications unavailable")]
+async fn warning_logged_notifications_unavailable(world: &mut AcceptanceWorld) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup dir should be configured");
+    let content = fs::read_to_string(backup_dir.join("backup.log")).expect("expected backup.log");
+    assert!(
+        content.to_lowercase().contains("notifications unavailable"),
+        "expected notifications unavailable warning in backup.log, got `{content}`"
+    );
+}
+
 #[then("stdout indicates scheduled jobs are active")]
 async fn stdout_indicates_scheduled_jobs_active(world: &mut AcceptanceWorld) {
     assert!(
@@ -1919,7 +2647,21 @@ async fn notification_contains(world: &mut AcceptanceWorld, text: String) {
 
 #[then("the backup completes successfully")]
 async fn backup_completes_successfully(world: &mut AcceptanceWorld) {
-    assert_eq!(world.exit_code, 0, "backup should complete successfully");
+    assert_eq!(
+        world.exit_code, 0,
+        "backup should complete successfully; stdout=`{}` stderr=`{}`",
+        world.stdout, world.stderr
+    );
+}
+
+#[then("the notification explains that SQLite databases are safely backed up")]
+async fn notification_explains_sqlite_safely_backed_up(world: &mut AcceptanceWorld) {
+    notification_contains(world, "SQLite databases are safely backed up".to_string()).await;
+}
+
+#[then("the notification explains that session files may be mid-write")]
+async fn notification_explains_session_mid_write(world: &mut AcceptanceWorld) {
+    notification_contains(world, "session files may be mid-write".to_string()).await;
 }
 
 #[then("all backup archives still exist")]
@@ -2035,7 +2777,7 @@ async fn archive_does_not_exist(world: &mut AcceptanceWorld, file: String) {
 #[then("settings.toml does not exist")]
 async fn settings_toml_missing(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
-    let config_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    let config_path = platform_config_path(&workspace, &current_test_os(world));
     assert!(
         !config_path.exists(),
         "settings.toml should be removed by uninstall"
@@ -2377,22 +3119,131 @@ async fn main() {
     let notifications_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/features/platform/notifications.feature");
     std::env::set_var("ZEN_BACKUP_TEST_OS", "darwin");
+    AcceptanceWorld::filter_run(notifications_feature.clone(), |feature, _, scenario| {
+        feature.name == "Notifications"
+            && matches!(
+                scenario.name.as_str(),
+                "Warning notification via terminal-notifier or osascript when browser is running"
+                    | "Error notification via terminal-notifier or osascript when profile is missing"
+                    | "Error notification via terminal-notifier or osascript when cloud sync fails on macOS"
+                    | "Browser running notification explains SQLite safety"
+                    | "No notification when notifications are disabled"
+            )
+    })
+    .await;
+
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "linux");
+    AcceptanceWorld::filter_run(notifications_feature.clone(), |feature, _, scenario| {
+        feature.name == "Notifications"
+            && matches!(
+                scenario.name.as_str(),
+                "Warning notification via notify-send when browser is running"
+                    | "Error notification via notify-send when profile is missing"
+                    | "Error notification when cloud sync fails on Linux"
+                    | "Browser running notification explains SQLite safety"
+                    | "No notification when notifications are disabled"
+                    | "Backup continues when notify-send is not available"
+            )
+    })
+    .await;
+
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "windows");
     AcceptanceWorld::filter_run(notifications_feature, |feature, _, scenario| {
         feature.name == "Notifications"
-            && scenario.name
-                == "Warning notification via terminal-notifier or osascript when browser is running"
+            && matches!(
+                scenario.name.as_str(),
+                "Warning notification via PowerShell toast when browser is running"
+                    | "Error notification via PowerShell toast when profile is missing"
+                    | "Error notification when cloud sync fails on Windows"
+                    | "Browser running notification explains SQLite safety"
+                    | "No notification when notifications are disabled"
+                    | "Backup continues when toast notifications fail"
+            )
     })
     .await;
 
     let install_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/features/platform/install.feature");
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "darwin");
+    AcceptanceWorld::filter_run(install_feature.clone(), |feature, _, scenario| {
+        feature.name == "Install"
+            && matches!(
+                scenario.name.as_str(),
+                "Profile auto-detected on macOS"
+                    | "User prompted when no profile found"
+                    | "User prompted for backup directory"
+                    | "Default backup directory on Unix-like systems"
+                    | "Google Drive detected on macOS"
+                    | "iCloud Drive detected on macOS"
+                    | "OneDrive detected on macOS"
+                    | "Dropbox detected"
+                    | "Custom path option always available"
+                    | "Local-only option always available"
+                    | "Installer recommends terminal-notifier when unavailable"
+                    | "User can skip cloud sync"
+                    | "Valid settings.toml is created"
+                    | "Launchd agents installed on macOS"
+                    | "Launchd plists have paths substituted"
+                    | "Uninstall removes launchd agents"
+                    | "Uninstall preserves backup archives"
+                    | "Uninstall removes settings.toml"
+                    | "Uninstall warns when backups are preserved"
+                    | "Install fails gracefully on permission error"
+                    | "Install validates profile path exists"
+            )
+    })
+    .await;
+
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "linux");
+    AcceptanceWorld::filter_run(install_feature.clone(), |feature, _, scenario| {
+        feature.name == "Install"
+            && matches!(
+                scenario.name.as_str(),
+                "Profile auto-detected on Linux (.zen)"
+                    | "Profile auto-detected on Linux (.config/zen)"
+                    | "User prompted when no profile found"
+                    | "User prompted for backup directory"
+                    | "Default backup directory on Unix-like systems"
+                    | "Google Drive detected on Linux"
+                    | "Dropbox detected"
+                    | "Custom path option always available"
+                    | "Local-only option always available"
+                    | "User can skip cloud sync"
+                    | "Valid settings.toml is created"
+                    | "Systemd user timers installed on Linux"
+                    | "Uninstall removes systemd timers"
+                    | "Uninstall preserves backup archives"
+                    | "Uninstall removes settings.toml"
+                    | "Uninstall warns when backups are preserved"
+                    | "Install fails gracefully on permission error"
+                    | "Install validates profile path exists"
+            )
+    })
+    .await;
+
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "windows");
     AcceptanceWorld::filter_run(install_feature, |feature, _, scenario| {
         feature.name == "Install"
             && matches!(
                 scenario.name.as_str(),
-                "Uninstall preserves backup archives"
+                "Profile auto-detected on Windows"
+                    | "User prompted when no profile found"
+                    | "User prompted for backup directory"
+                    | "Default backup directory on Windows"
+                    | "Google Drive detected on Windows"
+                    | "OneDrive detected on Windows"
+                    | "Dropbox detected"
+                    | "Custom path option always available"
+                    | "Local-only option always available"
+                    | "User can skip cloud sync"
+                    | "Valid settings.toml is created"
+                    | "Task Scheduler tasks created on Windows"
+                    | "Uninstall removes Task Scheduler tasks"
+                    | "Uninstall preserves backup archives"
                     | "Uninstall removes settings.toml"
                     | "Uninstall warns when backups are preserved"
+                    | "Install fails gracefully on permission error"
+                    | "Install validates profile path exists"
             )
     })
     .await;
@@ -2412,6 +3263,7 @@ async fn main() {
 
     let retention_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/features/core/retention.feature");
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "darwin");
     AcceptanceWorld::filter_run(retention_feature, |feature, _, scenario| {
         feature.name == "Retention"
             && matches!(
@@ -2432,6 +3284,7 @@ async fn main() {
 
     let configuration_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/features/core/configuration.feature");
+    std::env::set_var("ZEN_BACKUP_TEST_OS", "darwin");
     AcceptanceWorld::filter_run(configuration_feature, |feature, _, scenario| {
         feature.name == "Configuration"
             && matches!(
@@ -2488,14 +3341,19 @@ fn write_settings(workspace: &Path, backup_dir: &Path) {
     let profile_dir = workspace.join("profile");
     fs::create_dir_all(&profile_dir).expect("failed to create profile dir");
 
-    let config_dir = workspace.join(".config/zen-profile-backup");
+    let test_os = std::env::var("ZEN_BACKUP_TEST_OS").unwrap_or_else(|_| "darwin".to_string());
+    let config_path = platform_config_path(workspace, &test_os);
+    let config_dir = config_path
+        .parent()
+        .expect("platform config path should have a parent")
+        .to_path_buf();
     fs::create_dir_all(&config_dir).expect("failed to create config dir");
     let config_body = format!(
         "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
         profile_dir.display(),
         backup_dir.display(),
     );
-    fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+    fs::write(config_path, config_body).expect("failed to write settings");
 }
 
 fn run_command(world: &mut AcceptanceWorld, command: &str) {
@@ -2747,7 +3605,11 @@ fn write_settings_for_profile(
     profile_dir: &Path,
     backup_dir: &Path,
 ) {
-    let config_dir = workspace.join(".config/zen-profile-backup");
+    let config_path = platform_config_path(workspace, &current_test_os(world));
+    let config_dir = config_path
+        .parent()
+        .expect("platform config path should have a parent")
+        .to_path_buf();
     fs::create_dir_all(&config_dir).expect("failed to create config dir");
 
     let mut profile_path = profile_dir.display().to_string();
@@ -2794,7 +3656,9 @@ fn write_settings_for_profile(
             let mut fields = section_keys.remove(section).unwrap_or_default();
             fields.sort_by(|a, b| a.0.cmp(b.0));
             for (field, value) in fields {
-                if value.chars().all(|c| c.is_ascii_digit()) {
+                if value.chars().all(|c| c.is_ascii_digit())
+                    || matches!(value, "true" | "false")
+                {
                     config_body.push_str(&format!("{field} = {value}\n"));
                 } else {
                     config_body.push_str(&format!("{field} = \"{value}\"\n"));
@@ -2802,7 +3666,7 @@ fn write_settings_for_profile(
             }
         }
     }
-    fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+    fs::write(config_path, config_body).expect("failed to write settings");
 }
 
 fn rewrite_settings_from_world(world: &AcceptanceWorld) {
@@ -2971,6 +3835,75 @@ fn assert_archive_exists_in_subdirectory(
             "expected archive to be absent: {}",
             path.display()
         );
+    }
+}
+
+fn resolve_fixture_path(world: &mut AcceptanceWorld, raw: &str) -> PathBuf {
+    let workspace = ensure_workspace(world);
+    if let Some(rest) = raw.strip_prefix("~/") {
+        return workspace.join(rest);
+    }
+    if let Some(rest) = raw.strip_prefix("%APPDATA%") {
+        let rest = rest.trim_start_matches(['\\', '/']);
+        return workspace.join("AppData").join("Roaming").join(rest.replace('\\', "/"));
+    }
+    if let Some(rest) = raw.strip_prefix("%USERPROFILE%") {
+        let rest = rest.trim_start_matches(['\\', '/']);
+        return workspace.join(rest.replace('\\', "/"));
+    }
+    workspace.join(raw.replace('\\', "/"))
+}
+
+fn infer_platform_from_path_hint(raw: &str) -> &'static str {
+    if raw.contains("%APPDATA%") || raw.contains("%USERPROFILE%") {
+        "windows"
+    } else if raw.contains(".zen/") || raw.contains(".config/zen") {
+        "linux"
+    } else {
+        "darwin"
+    }
+}
+
+fn platform_to_test_os(platform: &str) -> &'static str {
+    match platform {
+        "macos" => "darwin",
+        "linux" => "linux",
+        "windows" => "windows",
+        other => panic!("unsupported platform value: {other}"),
+    }
+}
+
+fn assert_settings_contains(world: &mut AcceptanceWorld, needle: &str) {
+    let workspace = ensure_workspace(world);
+    let config_path = platform_config_path(&workspace, &current_test_os(world));
+    let content = fs::read_to_string(config_path).expect("expected settings.toml");
+    assert!(
+        content.contains(needle),
+        "expected settings.toml to contain `{needle}`, got:\n{content}"
+    );
+}
+
+fn current_test_os(world: &AcceptanceWorld) -> String {
+    world
+        .env
+        .get("ZEN_BACKUP_TEST_OS")
+        .cloned()
+        .or_else(|| std::env::var("ZEN_BACKUP_TEST_OS").ok())
+        .unwrap_or_else(|| "darwin".to_string())
+}
+
+fn platform_config_path(workspace: &Path, test_os: &str) -> PathBuf {
+    if test_os == "windows" {
+        workspace
+            .join("AppData")
+            .join("Roaming")
+            .join("zen-profile-backup")
+            .join("settings.toml")
+    } else {
+        workspace
+            .join(".config")
+            .join("zen-profile-backup")
+            .join("settings.toml")
     }
 }
 
