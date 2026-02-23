@@ -1,6 +1,9 @@
 use crate::config::{load_config, ConfigError};
+use chrono::{DateTime, Utc};
 use std::ffi::OsStr;
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -103,6 +106,14 @@ pub fn run_restore(archive_arg: &str, cwd: &Path) -> CommandOutput {
         };
     }
 
+    append_restore_log(
+        Path::new(&config.backup_local_path),
+        &archive_path
+            .file_name()
+            .unwrap_or_else(|| OsStr::new("archive"))
+            .to_string_lossy(),
+    );
+
     CommandOutput {
         exit_code: 0,
         stdout: format!(
@@ -112,6 +123,30 @@ pub fn run_restore(archive_arg: &str, cwd: &Path) -> CommandOutput {
         ),
         stderr: String::new(),
     }
+}
+
+fn append_restore_log(backup_root: &Path, archive_name: &str) {
+    let log_path = backup_root.join("backup.log");
+    let _ = fs::create_dir_all(backup_root);
+    let mut file = match OpenOptions::new().create(true).append(true).open(log_path) {
+        Ok(file) => file,
+        Err(_) => return,
+    };
+    let _ = writeln!(
+        file,
+        "[{}] RESTORE: restored {}",
+        now_iso_utc(),
+        archive_name
+    );
+}
+
+fn now_iso_utc() -> String {
+    if let Ok(raw) = std::env::var("ZEN_BACKUP_TEST_NOW") {
+        if let Ok(value) = DateTime::parse_from_rfc3339(&raw) {
+            return value.with_timezone(&Utc).to_rfc3339();
+        }
+    }
+    Utc::now().to_rfc3339()
 }
 
 fn resolve_archive_path(input: &str, cwd: &Path, backup_root: &Path) -> Option<PathBuf> {

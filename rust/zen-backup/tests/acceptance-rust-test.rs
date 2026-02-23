@@ -42,6 +42,11 @@ async fn backup_directory_empty(world: &mut AcceptanceWorld) {
     write_settings(&workspace, &backup_dir);
 }
 
+#[given("the backup directory contains no archives")]
+async fn backup_directory_contains_no_archives(world: &mut AcceptanceWorld) {
+    backup_directory_empty(world).await;
+}
+
 #[given("the backup directory does not exist")]
 async fn backup_directory_missing(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
@@ -411,6 +416,55 @@ async fn no_backup_scheduled_jobs_installed(world: &mut AcceptanceWorld) {
         resources_root
             .join("launchd")
             .join("com.prometheas.zen-backup.weekly.plist"),
+    );
+}
+
+#[given("the most recent daily backup is less than 2 days old")]
+async fn most_recent_daily_backup_recent(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    world.env.insert(
+        "ZEN_BACKUP_TEST_NOW".to_string(),
+        "2026-01-16T12:00:00Z".to_string(),
+    );
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let daily_dir = backup_dir.join("daily");
+    fs::create_dir_all(&daily_dir).expect("failed to create daily dir");
+    fs::write(
+        daily_dir.join("zen-backup-daily-2026-01-15.tar.gz"),
+        b"daily",
+    )
+    .expect("failed to write recent daily archive");
+}
+
+#[given("the most recent daily backup is more than 3 days old")]
+async fn most_recent_daily_backup_stale(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    world.env.insert(
+        "ZEN_BACKUP_TEST_NOW".to_string(),
+        "2026-01-16T12:00:00Z".to_string(),
+    );
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let daily_dir = backup_dir.join("daily");
+    fs::create_dir_all(&daily_dir).expect("failed to create daily dir");
+    fs::write(
+        daily_dir.join("zen-backup-daily-2026-01-10.tar.gz"),
+        b"daily",
+    )
+    .expect("failed to write stale daily archive");
+}
+
+#[given("the backup tool was installed more than 1 day ago")]
+async fn backup_tool_installed_more_than_one_day(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    world.env.insert(
+        "ZEN_BACKUP_TEST_NOW".to_string(),
+        "2026-01-16T12:00:00Z".to_string(),
     );
 }
 
@@ -864,6 +918,35 @@ async fn stdout_indicates_scheduled_jobs_active(world: &mut AcceptanceWorld) {
     );
 }
 
+#[then("stdout indicates healthy status or no warnings")]
+async fn stdout_indicates_healthy_or_no_warnings(world: &mut AcceptanceWorld) {
+    let healthy = world.stdout.contains("Health: recent daily backup exists.");
+    let no_warning = !world.stdout.to_lowercase().contains("warning");
+    assert!(
+        healthy || no_warning,
+        "expected healthy/no-warning status, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout contains a warning about stale backups")]
+async fn stdout_contains_stale_warning(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.to_lowercase().contains("stale"),
+        "expected stale warning in status output, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout contains a warning suggesting to run a backup")]
+async fn stdout_contains_run_backup_warning(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("No backups yet. Run a backup."),
+        "expected no-backups warning in status output, got `{}`",
+        world.stdout
+    );
+}
+
 #[then(expr = "a macOS notification is displayed with title {string}")]
 async fn macos_notification_with_title(world: &mut AcceptanceWorld, title: String) {
     let backup_dir = world
@@ -1093,6 +1176,9 @@ async fn main() {
                     | "Status shows most recent weekly backup"
                     | "Status indicates scheduled jobs are loaded"
                     | "Status indicates no scheduled jobs"
+                    | "Status indicates healthy when recent backup exists"
+                    | "Status warns when no recent backups"
+                    | "Status warns when no backups at all"
             )
     })
     .await;
@@ -1124,6 +1210,7 @@ async fn main() {
                     | "Pre-restore backup is preserved after restore completes"
                     | "Restore is blocked when Zen browser is running"
                     | "Error identifies the corrupted archive"
+                    | "Successful restore is logged"
             )
     })
     .await;
