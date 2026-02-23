@@ -634,6 +634,15 @@ async fn stdout_contains(world: &mut AcceptanceWorld, needle: String) {
     );
 }
 
+#[then(expr = "stdout does not contain {string}")]
+async fn stdout_does_not_contain(world: &mut AcceptanceWorld, needle: String) {
+    assert!(
+        !world.stdout.contains(&needle),
+        "expected stdout to exclude `{needle}`, got `{}`",
+        world.stdout
+    );
+}
+
 #[then(expr = "stdout suggests running {string}")]
 async fn stdout_suggests(world: &mut AcceptanceWorld, expected: String) {
     assert!(
@@ -672,6 +681,23 @@ async fn stdout_contains_or_date_indicator(world: &mut AcceptanceWorld, left: St
     assert!(
         world.stdout.contains(&left) || has_date,
         "expected stdout to contain `{left}` or a date indicator, got `{}`",
+        world.stdout
+    );
+}
+
+#[then(expr = "{string} appears before {string} in stdout")]
+async fn first_appears_before_second(world: &mut AcceptanceWorld, first: String, second: String) {
+    let first_idx = world
+        .stdout
+        .find(&first)
+        .unwrap_or_else(|| panic!("`{first}` not found in stdout: {}", world.stdout));
+    let second_idx = world
+        .stdout
+        .find(&second)
+        .unwrap_or_else(|| panic!("`{second}` not found in stdout: {}", world.stdout));
+    assert!(
+        first_idx < second_idx,
+        "expected `{first}` before `{second}` in stdout: {}",
         world.stdout
     );
 }
@@ -918,6 +944,28 @@ async fn stdout_indicates_scheduled_jobs_active(world: &mut AcceptanceWorld) {
     );
 }
 
+#[then("the daily archive is labeled as \"daily\" or in a daily section")]
+async fn daily_archive_labeled(world: &mut AcceptanceWorld) {
+    let has_daily_label = world.stdout.contains("daily");
+    let has_daily_archive = world.stdout.contains("zen-backup-daily-");
+    assert!(
+        has_daily_label && has_daily_archive,
+        "expected daily archive label/section in stdout: {}",
+        world.stdout
+    );
+}
+
+#[then("the weekly archive is labeled as \"weekly\" or in a weekly section")]
+async fn weekly_archive_labeled(world: &mut AcceptanceWorld) {
+    let has_weekly_label = world.stdout.contains("weekly");
+    let has_weekly_archive = world.stdout.contains("zen-backup-weekly-");
+    assert!(
+        has_weekly_label && has_weekly_archive,
+        "expected weekly archive label/section in stdout: {}",
+        world.stdout
+    );
+}
+
 #[then("stdout indicates healthy status or no warnings")]
 async fn stdout_indicates_healthy_or_no_warnings(world: &mut AcceptanceWorld) {
     let healthy = world.stdout.contains("Health: recent daily backup exists.");
@@ -1159,8 +1207,12 @@ async fn main() {
             && matches!(
                 scenario.name.as_str(),
                 "List shows daily and weekly archives"
+                    | "List shows file sizes"
+                    | "Archives are listed in chronological order"
                     | "List handles empty backup directory"
                     | "List handles missing backup directory"
+                    | "List shows only valid archive files"
+                    | "List distinguishes daily and weekly types"
             )
     })
     .await;
