@@ -40,11 +40,12 @@ Status values:
 
 ## Acceptance Coverage Status
 
-- Current canonical acceptance execution remains Cucumber-JS via `deno task test:acceptance`.
-- Rust runtime is exercised indirectly by acceptance through `runCli()` bridge.
-- Cucumber-rs dual-run is **not yet** enabled in CI.
+- Cucumber-rs acceptance executes via `deno task test:acceptance:rust`.
+- Cucumber-JS acceptance remains available via `deno task test:acceptance` during burn-in.
+- CI now runs both acceptance engines (JS platform suite + Rust suite) on Linux and Windows.
 
 ## Known Gaps Before TS Runtime Removal
 
-1. Cucumber-rs harness needs to be added and dual-run against canonical feature files.
-2. CI should execute both acceptance engines during burn-in to prove parity.
+1. Keep dual-run burn-in active for at least one full prerelease cycle.
+2. Remove Cucumber-JS harness/tasks/docs once burn-in stability is confirmed.
+3. Delete remaining legacy TypeScript runtime-only modules and references.

@@ -35,6 +35,7 @@ jobs:
           deno task test:unit
           deno task test:integration
           deno task test:acceptance:platform:linux
+          deno task test:acceptance:rust
 
       - name: Resolve release version
         id: version
