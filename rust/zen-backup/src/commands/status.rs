@@ -56,6 +56,7 @@ pub fn run_status(cwd: &Path) -> CommandOutput {
             }
 
             if !is_readable_directory(backup_dir) {
+                lines.push("Backup directory permission error.".to_string());
                 return CommandOutput {
                     exit_code: 1,
                     stdout: lines.join("\n"),
@@ -262,6 +263,13 @@ fn now_utc() -> DateTime<Utc> {
 }
 
 fn is_readable_directory(path: &Path) -> bool {
+    if std::env::var("ZEN_BACKUP_TEST_STATUS_PERMISSION_DENIED")
+        .ok()
+        .as_deref()
+        == Some("1")
+    {
+        return false;
+    }
     match fs::read_dir(path) {
         Ok(_) => true,
         Err(err) => err.kind() != io::ErrorKind::PermissionDenied,

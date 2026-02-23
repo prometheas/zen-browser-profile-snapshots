@@ -2,6 +2,8 @@ use cucumber::{gherkin::Step, given, then, when, World as _};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
@@ -47,6 +49,59 @@ async fn backup_directory_empty(world: &mut AcceptanceWorld) {
 #[given("the backup directory contains no archives")]
 async fn backup_directory_contains_no_archives(world: &mut AcceptanceWorld) {
     backup_directory_empty(world).await;
+}
+
+#[given("the backup directory exists but contains no daily archives")]
+async fn backup_directory_no_daily_archives(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let backup_dir = workspace.join("backups");
+    let daily_dir = backup_dir.join("daily");
+    let weekly_dir = backup_dir.join("weekly");
+    fs::create_dir_all(&daily_dir).expect("failed to create daily dir");
+    fs::create_dir_all(&weekly_dir).expect("failed to create weekly dir");
+    fs::write(
+        weekly_dir.join("zen-backup-weekly-2026-01-12.tar.gz"),
+        b"weekly",
+    )
+    .expect("failed to seed weekly archive");
+    write_settings(&workspace, &backup_dir);
+}
+
+#[given("the backup directory exists but contains no weekly archives")]
+async fn backup_directory_no_weekly_archives(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let backup_dir = workspace.join("backups");
+    let daily_dir = backup_dir.join("daily");
+    let weekly_dir = backup_dir.join("weekly");
+    fs::create_dir_all(&daily_dir).expect("failed to create daily dir");
+    fs::create_dir_all(&weekly_dir).expect("failed to create weekly dir");
+    fs::write(daily_dir.join("zen-backup-daily-2026-01-15.tar.gz"), b"daily")
+        .expect("failed to seed daily archive");
+    write_settings(&workspace, &backup_dir);
+}
+
+#[given(expr = "the backup directory contains archives totaling {int} MB")]
+async fn backup_directory_archives_totaling(world: &mut AcceptanceWorld, total_mb: i32) {
+    let workspace = ensure_workspace(world);
+    let backup_dir = workspace.join("backups");
+    let daily_dir = backup_dir.join("daily");
+    let weekly_dir = backup_dir.join("weekly");
+    fs::create_dir_all(&daily_dir).expect("failed to create daily dir");
+    fs::create_dir_all(&weekly_dir).expect("failed to create weekly dir");
+    let bytes = (total_mb.max(0) as usize) * 1024 * 1024;
+    let daily_bytes = bytes * 3 / 5;
+    let weekly_bytes = bytes - daily_bytes;
+    fs::write(
+        daily_dir.join("zen-backup-daily-2026-01-15.tar.gz"),
+        vec![0_u8; daily_bytes],
+    )
+    .expect("failed to write daily archive");
+    fs::write(
+        weekly_dir.join("zen-backup-weekly-2026-01-12.tar.gz"),
+        vec![0_u8; weekly_bytes],
+    )
+    .expect("failed to write weekly archive");
+    write_settings(&workspace, &backup_dir);
 }
 
 #[given("the backup directory does not exist")]
@@ -179,22 +234,34 @@ async fn backup_directory_contains(world: &mut AcceptanceWorld, step: &Step) {
     let subdirectory_index = *headers
         .get("subdirectory")
         .expect("missing subdirectory column");
-    let file_index = *headers.get("file").expect("missing file column");
+    let file_index = headers.get("file").copied();
+    let total_size_index = headers.get("total_size").copied();
     let size_index = headers.get("size").copied();
 
     for row in table.rows.iter().skip(1) {
         let subdirectory = row[subdirectory_index].trim();
-        let file = row[file_index].trim();
-        if file.is_empty() {
+        let file = file_index.and_then(|idx| row.get(idx)).map(|value| value.trim());
+        let total_size = total_size_index
+            .and_then(|idx| row.get(idx))
+            .map(|value| value.trim());
+        let Some(path) = file
+            .filter(|value| !value.is_empty())
+            .map(|value| backup_dir.join(subdirectory).join(value))
+            .or_else(|| {
+                total_size
+                    .filter(|value| !value.is_empty())
+                    .map(|_| backup_dir.join(subdirectory).join("seed.tar.gz"))
+            })
+        else {
             continue;
-        }
-        let path = backup_dir.join(subdirectory).join(file);
+        };
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).expect("failed to create archive parent");
         }
         let size = size_index
             .and_then(|idx| row.get(idx))
             .map(|value| parse_size_to_bytes(value))
+            .or_else(|| total_size.map(parse_size_to_bytes))
             .unwrap_or(256);
         fs::write(path, vec![0_u8; size]).expect("failed to write archive file");
     }
@@ -517,6 +584,28 @@ async fn backup_tool_installed(world: &mut AcceptanceWorld) {
     assert_eq!(world.exit_code, 0, "install failed: {}", world.stderr);
 }
 
+#[given("settings.toml contains:")]
+async fn settings_toml_contains(world: &mut AcceptanceWorld, step: &Step) {
+    ensure_backup_workspace(world);
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let key_index = *headers.get("key").expect("missing key column");
+    let value_index = *headers.get("value").expect("missing value column");
+    for row in table.rows.iter().skip(1) {
+        let key = row[key_index].trim();
+        let value = row[value_index].trim();
+        if key.is_empty() {
+            continue;
+        }
+        world
+            .config_overrides
+            .insert(key.to_string(), value.to_string());
+    }
+    rewrite_settings_from_world(world);
+}
+
 #[given("the backup scheduled jobs are installed")]
 async fn backup_scheduled_jobs_installed(world: &mut AcceptanceWorld) {
     backup_tool_installed(world).await;
@@ -586,6 +675,39 @@ async fn backup_tool_installed_more_than_one_day(world: &mut AcceptanceWorld) {
     world.env.insert(
         "ZEN_BACKUP_TEST_NOW".to_string(),
         "2026-01-16T12:00:00Z".to_string(),
+    );
+}
+
+#[given("the configured backup directory does not exist")]
+async fn configured_backup_directory_missing(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    let workspace = ensure_workspace(world);
+    let missing_backup_dir = workspace.join("missing-backup-dir");
+    world.config_overrides.insert(
+        "backup.local_path".to_string(),
+        missing_backup_dir.display().to_string(),
+    );
+    rewrite_settings_from_world(world);
+}
+
+#[given("the backup directory is not readable")]
+async fn backup_directory_not_readable(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured")
+        .clone();
+    #[cfg(unix)]
+    {
+        let metadata = fs::metadata(&backup_dir).expect("failed to stat backup dir");
+        let mut permissions = metadata.permissions();
+        permissions.set_mode(0o000);
+        fs::set_permissions(&backup_dir, permissions).expect("failed to set unreadable permissions");
+    }
+    world.env.insert(
+        "ZEN_BACKUP_TEST_STATUS_PERMISSION_DENIED".to_string(),
+        "1".to_string(),
     );
 }
 
@@ -839,8 +961,11 @@ async fn stdout_suggests(world: &mut AcceptanceWorld, expected: String) {
 
 #[then(expr = "stdout contains {string} or {string}")]
 async fn stdout_contains_either(world: &mut AcceptanceWorld, left: String, right: String) {
+    let stdout = world.stdout.to_lowercase();
+    let left_lower = left.to_lowercase();
+    let right_lower = right.to_lowercase();
     assert!(
-        world.stdout.contains(&left) || world.stdout.contains(&right),
+        stdout.contains(&left_lower) || stdout.contains(&right_lower),
         "expected stdout to contain `{left}` or `{right}`, got `{}`",
         world.stdout
     );
@@ -1425,6 +1550,133 @@ async fn stdout_indicates_scheduled_jobs_active(world: &mut AcceptanceWorld) {
     );
 }
 
+#[then("stdout contains disk usage information")]
+async fn stdout_contains_disk_usage_information(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Disk usage total:"),
+        "expected status output to include disk usage total, got `{}`",
+        world.stdout
+    );
+}
+
+#[then(expr = "the displayed usage is approximately {int} MB")]
+async fn displayed_usage_approximately_mb(world: &mut AcceptanceWorld, expected_mb: i32) {
+    let expected = expected_mb.max(0) as f64;
+    let actual = extract_size_value_in_mb(&world.stdout, "Disk usage total:")
+        .expect("failed to parse total disk usage from status output");
+    assert!(
+        (actual - expected).abs() <= 2.0,
+        "expected disk usage around {expected} MB, got {actual:.1} MB"
+    );
+}
+
+#[then("stdout shows daily directory size")]
+async fn stdout_shows_daily_directory_size(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Disk usage daily:"),
+        "expected daily size line in stdout, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout shows weekly directory size")]
+async fn stdout_shows_weekly_directory_size(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Disk usage weekly:"),
+        "expected weekly size line in stdout, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout shows the profile path")]
+async fn stdout_shows_profile_path(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Profile path:"),
+        "expected profile path line, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout shows the backup directory")]
+async fn stdout_shows_backup_directory(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("Backup directory:"),
+        "expected backup directory line, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout shows cloud sync is enabled")]
+async fn stdout_shows_cloud_sync_enabled(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.to_lowercase().contains("cloud sync: enabled"),
+        "expected cloud sync enabled output, got `{}`",
+        world.stdout
+    );
+}
+
+#[then(expr = "stdout indicates {string} or no cloud path")]
+async fn stdout_indicates_local_only_or_no_cloud_path(
+    world: &mut AcceptanceWorld,
+    phrase: String,
+) {
+    let lowercase = world.stdout.to_lowercase();
+    assert!(
+        lowercase.contains(&phrase.to_lowercase()) || lowercase.contains("cloud sync: local only"),
+        "expected local-only cloud indicator, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout shows daily retention period")]
+async fn stdout_shows_daily_retention_period(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("daily 30 days"),
+        "expected daily retention period in stdout, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout shows weekly retention period")]
+async fn stdout_shows_weekly_retention_period(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.contains("weekly 84 days"),
+        "expected weekly retention period in stdout, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout indicates backup directory not found")]
+async fn stdout_indicates_backup_directory_not_found(world: &mut AcceptanceWorld) {
+    assert!(
+        world.stdout.to_lowercase().contains("backup directory not found"),
+        "expected missing backup directory message, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("suggests running a backup or checking configuration")]
+async fn suggests_running_backup_or_checking_configuration(world: &mut AcceptanceWorld) {
+    let lowercase = world.stdout.to_lowercase();
+    assert!(
+        lowercase.contains("run a backup") || lowercase.contains("check configuration"),
+        "expected remediation guidance in stdout, got `{}`",
+        world.stdout
+    );
+}
+
+#[then("stdout indicates a permission error")]
+async fn stdout_indicates_permission_error(world: &mut AcceptanceWorld) {
+    let stdout_lower = world.stdout.to_lowercase();
+    let stderr_lower = world.stderr.to_lowercase();
+    assert!(
+        stdout_lower.contains("permission") || stderr_lower.contains("not readable"),
+        "expected permission error indication, stdout=`{}` stderr=`{}`",
+        world.stdout,
+        world.stderr
+    );
+}
+
 #[then("the daily archive is labeled as \"daily\" or in a daily section")]
 async fn daily_archive_labeled(world: &mut AcceptanceWorld) {
     let has_daily_label = world.stdout.contains("daily");
@@ -1796,6 +2048,15 @@ async fn main() {
                 "Status shows \"Not installed\" when settings.toml is missing"
                     | "Status shows most recent daily backup"
                     | "Status shows most recent weekly backup"
+                    | "Status shows \"no backups yet\" when no daily archives exist"
+                    | "Status shows \"no backups yet\" when no weekly archives exist"
+                    | "Status shows total disk usage"
+                    | "Status shows disk usage breakdown"
+                    | "Status shows configuration summary"
+                    | "Status shows local-only mode"
+                    | "Status shows retention settings"
+                    | "Status handles missing backup directory gracefully"
+                    | "Status handles permission error gracefully"
                     | "Status indicates scheduled jobs are loaded"
                     | "Status indicates no scheduled jobs"
                     | "Status indicates healthy when recent backup exists"
@@ -2089,6 +2350,30 @@ fn parse_size_to_bytes(value: &str) -> usize {
         return number as usize;
     }
     256
+}
+
+fn extract_size_value_in_mb(stdout: &str, prefix: &str) -> Option<f64> {
+    let line = stdout.lines().find(|line| line.starts_with(prefix))?;
+    let value = line.strip_prefix(prefix)?.trim();
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    if parts.len() != 2 {
+        return None;
+    }
+    let number = parts[0].parse::<f64>().ok()?;
+    let unit = parts[1].to_ascii_uppercase();
+    if unit == "MB" {
+        return Some(number);
+    }
+    if unit == "KB" {
+        return Some(number / 1024.0);
+    }
+    if unit == "GB" {
+        return Some(number * 1024.0);
+    }
+    if unit == "B" {
+        return Some(number / (1024.0 * 1024.0));
+    }
+    None
 }
 
 fn docstring(step: &Step) -> String {
