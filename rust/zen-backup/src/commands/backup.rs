@@ -65,6 +65,16 @@ pub fn run_backup(kind: &str, cwd: &Path) -> CommandOutput {
         };
     }
 
+    if config.notifications_enabled {
+        let os = std::env::var("ZEN_BACKUP_TEST_OS")
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+            .unwrap_or_else(|| std::env::consts::OS.to_string());
+        if notification_unavailable_for_os(&os) {
+            let _ = append_log(&local_root, "WARNING", "notifications unavailable");
+        }
+    }
+
     if std::env::var("ZEN_BACKUP_BROWSER_RUNNING").ok().as_deref() == Some("1") {
         let message =
             "browser is running; SQLite databases are safely backed up, but session files may be mid-write";
@@ -482,6 +492,14 @@ fn emit_notification(root: &Path, enabled: bool, title: &str, message: &str) -> 
     if !enabled {
         return Ok(());
     }
+    let os = std::env::var("ZEN_BACKUP_TEST_OS")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| std::env::consts::OS.to_string());
+    if notification_unavailable_for_os(&os) {
+        let _ = append_log(root, "WARNING", "notifications unavailable");
+        return Ok(());
+    }
     fs::create_dir_all(root).map_err(|_| ())?;
     let log_path = root.join("notifications.log");
     let mut file = fs::OpenOptions::new()
@@ -495,4 +513,10 @@ fn emit_notification(root: &Path, enabled: bool, title: &str, message: &str) -> 
 
 fn local_notification_root(path: &str) -> PathBuf {
     PathBuf::from(path)
+}
+
+fn notification_unavailable_for_os(os: &str) -> bool {
+    (os == "linux" && std::env::var("ZEN_BACKUP_TEST_NOTIFY_SEND_UNAVAILABLE").as_deref() == Ok("1"))
+        || (os == "windows"
+            && std::env::var("ZEN_BACKUP_TEST_WINDOWS_TOAST_FAIL").as_deref() == Ok("1"))
 }

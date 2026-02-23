@@ -17,7 +17,8 @@ pub fn run_install(cwd: &Path) -> CommandOutput {
         return CommandOutput {
             exit_code: 1,
             stdout: String::new(),
-            stderr: "Permission denied writing config directory".to_string(),
+            stderr: "Permission denied writing config directory. Try running with appropriate permissions."
+                .to_string(),
         };
     }
     if let Some(parent) = config_path.parent() {
@@ -33,6 +34,17 @@ pub fn run_install(cwd: &Path) -> CommandOutput {
     let os = platform::current_os();
     let home = platform::home_dir();
     let profile_path = detect_profile_path(&os, &home);
+    let validate_only = std::env::var("ZEN_BACKUP_VALIDATE_ONLY").as_deref() == Ok("1");
+    if validate_only
+        && std::env::var("ZEN_BACKUP_PROFILE_PATH")
+            .ok()
+            .is_some_and(|value| !value.trim().is_empty())
+        && profile_path.is_none()
+    {
+        stderr.push("Configured profile path does not exist.".to_string());
+        stdout.push("Please enter a valid profile path.".to_string());
+    }
+
     match &profile_path {
         Some(path) => {
             stdout.push(format!("Detected profile path: {}", path.display()));
