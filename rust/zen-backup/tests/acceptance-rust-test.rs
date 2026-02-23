@@ -18,6 +18,7 @@ struct AcceptanceWorld {
     last_archive: Option<PathBuf>,
     last_pre_restore_dir: Option<PathBuf>,
     pending_restore_archive: Option<PathBuf>,
+    extracted_archive_dir: Option<TempDir>,
     tracked_backup_archives: Vec<PathBuf>,
     config_overrides: HashMap<String, String>,
     configured_missing_profile_path: Option<PathBuf>,
@@ -262,6 +263,43 @@ async fn profile_directory_contains(world: &mut AcceptanceWorld, step: &Step) {
             create_sqlite_db(&path);
         } else {
             fs::write(path, b"fixture").expect("failed to write fixture file");
+        }
+    }
+}
+
+#[given("a profile directory additionally contains:")]
+async fn profile_directory_additionally_contains(world: &mut AcceptanceWorld, step: &Step) {
+    write_additional_profile_entries(world, step);
+}
+
+#[given("the profile directory additionally contains:")]
+async fn the_profile_directory_additionally_contains(world: &mut AcceptanceWorld, step: &Step) {
+    write_additional_profile_entries(world, step);
+}
+
+fn write_additional_profile_entries(world: &mut AcceptanceWorld, step: &Step) {
+    let profile_dir = world
+        .profile_dir
+        .clone()
+        .expect("profile directory should be initialized first");
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let file_index = *headers.get("file").expect("missing file column");
+    for row in table.rows.iter().skip(1) {
+        let file = row[file_index].trim();
+        if file.is_empty() {
+            continue;
+        }
+        let path = profile_dir.join(file);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("failed to create parent path");
+        }
+        if is_sqlite_file(file) {
+            create_sqlite_db(&path);
+        } else {
+            fs::write(path, b"fixture-extra").expect("failed to write fixture file");
         }
     }
 }
@@ -574,6 +612,32 @@ async fn backup_archives_exist(world: &mut AcceptanceWorld) {
     world.tracked_backup_archives.push(archive);
 }
 
+#[given(expr = "a daily backup archive {string} already exists")]
+async fn daily_backup_archive_already_exists(world: &mut AcceptanceWorld, file_name: String) {
+    ensure_backup_workspace(world);
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let archive = backup_dir.join("daily").join(file_name);
+    if let Some(parent) = archive.parent() {
+        fs::create_dir_all(parent).expect("failed to create archive parent");
+    }
+    fs::write(&archive, b"existing-archive").expect("failed to create existing archive");
+}
+
+#[given(expr = "cloud sync is configured to an inaccessible path")]
+async fn cloud_sync_inaccessible_path(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    let workspace = ensure_workspace(world);
+    let inaccessible = workspace.join("cloud-inaccessible");
+    fs::write(&inaccessible, b"not-a-directory").expect("failed to create inaccessible marker");
+    world
+        .config_overrides
+        .insert("backup.cloud_path".to_string(), inaccessible.display().to_string());
+    rewrite_settings_from_world(world);
+}
+
 #[given("settings.toml exists")]
 async fn settings_toml_exists(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
@@ -664,6 +728,28 @@ async fn backup_command_run(world: &mut AcceptanceWorld) {
     }
     drop(env_guard);
     run_command(world, "backup daily");
+}
+
+#[when("the archive is extracted to a temporary directory")]
+async fn archive_extracted_to_temp_dir(world: &mut AcceptanceWorld) {
+    let archive = world
+        .last_archive
+        .clone()
+        .expect("expected archive path from backup output");
+    let temp_dir = tempfile::tempdir().expect("failed to create extraction dir");
+    let output = Command::new("tar")
+        .arg("-xzf")
+        .arg(&archive)
+        .arg("-C")
+        .arg(temp_dir.path())
+        .output()
+        .expect("failed to extract archive");
+    assert!(
+        output.status.success(),
+        "failed to extract archive: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    world.extracted_archive_dir = Some(temp_dir);
 }
 
 #[when(expr = "restore is run with archive {string}")]
@@ -1115,6 +1201,115 @@ async fn profile_file_passes_check(world: &mut AcceptanceWorld, file_name: Strin
     );
 }
 
+#[then(expr = "{string} in the extracted archive passes {string}")]
+async fn extracted_archive_file_passes_check(
+    world: &mut AcceptanceWorld,
+    file_name: String,
+    sql: String,
+) {
+    let extracted = world
+        .extracted_archive_dir
+        .as_ref()
+        .expect("archive should be extracted to temp dir");
+    let target = extracted.path().join(file_name);
+    let output = Command::new("sqlite3")
+        .arg(target)
+        .arg(sql)
+        .output()
+        .expect("failed to run sqlite3");
+    assert!(
+        output.status.success(),
+        "sqlite command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8_lossy(&output.stdout).to_lowercase();
+    assert!(text.contains("ok"), "expected sqlite integrity check to include ok");
+}
+
+#[then(expr = "{string} in the extracted archive contains table {string}")]
+async fn extracted_archive_file_contains_table(
+    world: &mut AcceptanceWorld,
+    file_name: String,
+    table_name: String,
+) {
+    let extracted = world
+        .extracted_archive_dir
+        .as_ref()
+        .expect("archive should be extracted to temp dir");
+    let target = extracted.path().join(file_name);
+    let query = format!(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';"
+    );
+    let output = Command::new("sqlite3")
+        .arg(target)
+        .arg(query)
+        .output()
+        .expect("failed to run sqlite3");
+    assert!(
+        output.status.success(),
+        "sqlite query failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        text.trim() == table_name,
+        "expected table `{table_name}` in sqlite file, got `{}`",
+        text.trim()
+    );
+}
+
+#[then(expr = "the extracted archive contains {string}")]
+async fn extracted_archive_contains(world: &mut AcceptanceWorld, file_name: String) {
+    let extracted = world
+        .extracted_archive_dir
+        .as_ref()
+        .expect("archive should be extracted to temp dir");
+    assert!(
+        extracted.path().join(file_name).exists(),
+        "expected file in extracted archive"
+    );
+}
+
+#[then(expr = "the extracted archive does not contain {string}")]
+async fn extracted_archive_does_not_contain(world: &mut AcceptanceWorld, file_name: String) {
+    let extracted = world
+        .extracted_archive_dir
+        .as_ref()
+        .expect("archive should be extracted to temp dir");
+    assert!(
+        !extracted.path().join(file_name).exists(),
+        "unexpected file in extracted archive"
+    );
+}
+
+#[then(expr = "the archive contains {string}")]
+async fn archive_contains_file(world: &mut AcceptanceWorld, file_name: String) {
+    let archive = world
+        .last_archive
+        .clone()
+        .expect("expected archive path from backup output");
+    let output = Command::new("tar")
+        .arg("-tzf")
+        .arg(archive)
+        .output()
+        .expect("failed to list archive");
+    assert!(output.status.success(), "failed to list archive contents");
+    let listing = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        listing.lines().any(|line| line.trim_end_matches('/') == file_name),
+        "expected archive to contain {file_name}"
+    );
+}
+
+#[then("the local backup archive exists")]
+async fn local_backup_archive_exists(world: &mut AcceptanceWorld) {
+    let archive = world
+        .last_archive
+        .as_ref()
+        .expect("expected archive path from backup output");
+    assert!(archive.exists(), "expected local backup archive to exist");
+}
+
 #[then(expr = "a directory exists matching pattern {string}")]
 async fn directory_exists_matching_pattern(world: &mut AcceptanceWorld, pattern: String) {
     let pre_restore = world
@@ -1496,6 +1691,25 @@ async fn file_contains_line_matching(
     );
 }
 
+#[then(expr = "{string} contains {string}")]
+async fn file_contains_substring(world: &mut AcceptanceWorld, file_name: String, needle: String) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let path = backup_dir.join(file_name);
+    let content = fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!("expected file to exist: {}", path.display());
+    });
+    assert!(
+        content.contains(&needle),
+        "expected `{}` to contain `{}`, got:\n{}",
+        path.display(),
+        needle,
+        content
+    );
+}
+
 #[then(expr = "the archive exists in the local {string} subdirectory")]
 async fn archive_exists_in_local_subdirectory(world: &mut AcceptanceWorld, subdirectory: String) {
     let archive = world
@@ -1599,10 +1813,18 @@ async fn main() {
                 scenario.name.as_str(),
                 "Create a daily backup manually"
                     | "Create a weekly backup manually"
+                    | "Backup adds suffix when same-day archive already exists"
+                    | "SQLite databases are backed up safely"
+                    | "WAL and SHM files are not included in archive"
+                    | "Security-sensitive files are excluded"
+                    | "Cache and transient data is excluded"
+                    | "Extension data in moz-extension directories is included"
                     | "Warning logged when browser is running"
                     | "Error when profile directory does not exist"
                     | "Backup is copied to cloud path when configured"
                     | "No cloud copy when cloud sync is disabled"
+                    | "Successful backup is logged"
+                    | "Local backup succeeds when cloud sync fails"
             )
     })
     .await;
@@ -2138,7 +2360,7 @@ fn is_sqlite_file(path: &str) -> bool {
 fn create_sqlite_db(path: &Path) {
     let output = Command::new("sqlite3")
         .arg(path)
-        .arg("CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT);")
+        .arg("CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT); CREATE TABLE IF NOT EXISTS moz_places(id INTEGER PRIMARY KEY, url TEXT); CREATE TABLE IF NOT EXISTS moz_bookmarks(id INTEGER PRIMARY KEY, fk INTEGER);")
         .output()
         .expect("failed to execute sqlite3");
     assert!(
