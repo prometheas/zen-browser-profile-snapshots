@@ -87,5 +87,4 @@ Use this guide when creating tests, choosing test scope, and running validation.
 ## Runtime Selection Notes
 
 - `runCli()` uses the Rust runtime path by default.
-- Set `ZEN_BACKUP_USE_TS_CLI=1` to force the TypeScript runtime path.
 - Set `ZEN_BACKUP_RUST_CLI_BIN` to override the Rust binary path used by bridge tests.
