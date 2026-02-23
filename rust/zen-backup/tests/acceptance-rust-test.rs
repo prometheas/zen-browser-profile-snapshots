@@ -15,6 +15,7 @@ struct AcceptanceWorld {
     profile_dir: Option<PathBuf>,
     backup_dir: Option<PathBuf>,
     last_archive: Option<PathBuf>,
+    last_pre_restore_dir: Option<PathBuf>,
     pending_restore_archive: Option<PathBuf>,
     tracked_backup_archives: Vec<PathBuf>,
     config_overrides: HashMap<String, String>,
@@ -270,6 +271,32 @@ async fn profile_directory_with_different_content(world: &mut AcceptanceWorld) {
     )
     .expect("failed to write profile fixture");
     create_sqlite_db(&profile_dir.join("places.sqlite"));
+}
+
+#[given("the current profile contains:")]
+async fn current_profile_contains(world: &mut AcceptanceWorld, step: &Step) {
+    let profile_dir = world
+        .profile_dir
+        .clone()
+        .expect("profile dir should exist before writing profile contents");
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let file_index = *headers.get("file").expect("missing file column");
+    let content_index = *headers.get("content").expect("missing content column");
+    for row in table.rows.iter().skip(1) {
+        let file = row[file_index].trim();
+        if file.is_empty() {
+            continue;
+        }
+        let content = row[content_index].as_bytes();
+        let path = profile_dir.join(file);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("failed to create profile file parent");
+        }
+        fs::write(path, content).expect("failed to write profile fixture content");
+    }
 }
 
 #[given("the Zen browser is not running")]
@@ -699,6 +726,70 @@ async fn profile_file_passes_check(world: &mut AcceptanceWorld, file_name: Strin
     );
 }
 
+#[then(expr = "a directory exists matching pattern {string}")]
+async fn directory_exists_matching_pattern(world: &mut AcceptanceWorld, pattern: String) {
+    let pre_restore = world
+        .last_pre_restore_dir
+        .as_ref()
+        .expect("expected pre-restore directory path from restore output");
+    assert!(
+        pre_restore.exists() && pre_restore.is_dir(),
+        "expected pre-restore directory to exist: {}",
+        pre_restore.display()
+    );
+    let name = pre_restore.display().to_string();
+    if pattern.contains(".pre-restore-") {
+        let regex = regex::Regex::new(r"\.pre-restore-\d{4}-\d{2}-\d{2}(-\d+)?$")
+            .expect("invalid pre-restore regex");
+        assert!(
+            regex.is_match(&name),
+            "expected pre-restore path to match pattern, got: {}",
+            name
+        );
+    }
+}
+
+#[then(expr = "the pre-restore directory contains {string}")]
+async fn pre_restore_directory_contains(world: &mut AcceptanceWorld, file_name: String) {
+    let pre_restore = world
+        .last_pre_restore_dir
+        .as_ref()
+        .expect("expected pre-restore directory path from restore output");
+    assert!(
+        pre_restore.join(file_name).exists(),
+        "expected file in pre-restore directory"
+    );
+}
+
+#[then("the pre-restore directory still exists")]
+async fn pre_restore_directory_still_exists(world: &mut AcceptanceWorld) {
+    let pre_restore = world
+        .last_pre_restore_dir
+        .as_ref()
+        .expect("expected pre-restore directory path from restore output");
+    assert!(
+        pre_restore.exists() && pre_restore.is_dir(),
+        "expected pre-restore directory to still exist"
+    );
+}
+
+#[then("the pre-restore directory is not empty")]
+async fn pre_restore_directory_not_empty(world: &mut AcceptanceWorld) {
+    let pre_restore = world
+        .last_pre_restore_dir
+        .as_ref()
+        .expect("expected pre-restore directory path from restore output");
+    let has_entries = fs::read_dir(pre_restore)
+        .expect("failed to read pre-restore directory")
+        .filter_map(Result::ok)
+        .next()
+        .is_some();
+    assert!(
+        has_entries,
+        "expected pre-restore directory to be non-empty"
+    );
+}
+
 #[then("stdout contains the archive path")]
 async fn stdout_contains_archive_path(world: &mut AcceptanceWorld) {
     let archive = world
@@ -995,6 +1086,8 @@ async fn main() {
             && matches!(
                 scenario.name.as_str(),
                 "Restore from a daily backup"
+                    | "Current profile is backed up before restore"
+                    | "Pre-restore backup is preserved after restore completes"
                     | "Restore is blocked when Zen browser is running"
                     | "Error identifies the corrupted archive"
             )
@@ -1140,6 +1233,7 @@ fn run_command(world: &mut AcceptanceWorld, command: &str) {
         .trim_end()
         .to_string();
     world.last_archive = extract_archive_path(&world.stdout);
+    world.last_pre_restore_dir = extract_pre_restore_path(&world.stdout);
 }
 
 struct EnvGuard {
@@ -1238,6 +1332,16 @@ fn extract_archive_path(stdout: &str) -> Option<PathBuf> {
     for line in stdout.lines() {
         if line.starts_with(marker) && line.contains(path_marker) {
             let path = line.split(path_marker).nth(1)?;
+            return Some(PathBuf::from(path.trim()));
+        }
+    }
+    None
+}
+
+fn extract_pre_restore_path(stdout: &str) -> Option<PathBuf> {
+    let marker = "Pre-restore backup: ";
+    for line in stdout.lines() {
+        if let Some(path) = line.strip_prefix(marker) {
             return Some(PathBuf::from(path.trim()));
         }
     }
