@@ -90,6 +90,24 @@ async fn configuration_has_single(world: &mut AcceptanceWorld, assignment: Strin
     apply_configuration_assignment(world, &assignment);
 }
 
+#[given("the configuration does not specify retention periods")]
+async fn configuration_without_retention(world: &mut AcceptanceWorld) {
+    world.config_overrides.remove("retention.daily_days");
+    world.config_overrides.remove("retention.weekly_days");
+}
+
+#[given(expr = "the configuration has only {string}")]
+async fn configuration_has_only(world: &mut AcceptanceWorld, assignment: String) {
+    world.config_overrides.remove("retention.daily_days");
+    world.config_overrides.remove("retention.weekly_days");
+    apply_configuration_assignment(world, &assignment);
+}
+
+#[given(expr = "{string} is not configured")]
+async fn config_key_not_configured(world: &mut AcceptanceWorld, key: String) {
+    world.config_overrides.remove(&key);
+}
+
 #[given("the configuration has:")]
 async fn configuration_has_table(world: &mut AcceptanceWorld, step: &Step) {
     let Some(table) = step.table.as_ref() else {
@@ -151,6 +169,33 @@ async fn backup_directory_contains_daily_archives(world: &mut AcceptanceWorld, s
 #[given("the backup directory contains weekly archives:")]
 async fn backup_directory_contains_weekly_archives(world: &mut AcceptanceWorld, step: &Step) {
     backup_directory_contains_type_archives(world, step, "weekly");
+}
+
+#[given("cloud sync is configured")]
+async fn cloud_sync_is_configured(world: &mut AcceptanceWorld) {
+    cloud_sync_configured_valid_path(world).await;
+}
+
+#[given("the cloud daily directory contains:")]
+async fn cloud_daily_directory_contains(world: &mut AcceptanceWorld, step: &Step) {
+    cloud_directory_contains_type_archives(world, step, "daily");
+}
+
+#[given("the cloud weekly directory contains:")]
+async fn cloud_weekly_directory_contains(world: &mut AcceptanceWorld, step: &Step) {
+    cloud_directory_contains_type_archives(world, step, "weekly");
+}
+
+#[given("the daily backup directory is empty")]
+async fn daily_backup_directory_empty(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let daily_dir = backup_dir.join("daily");
+    let _ = fs::remove_dir_all(&daily_dir);
+    fs::create_dir_all(daily_dir).expect("failed to create empty daily directory");
 }
 
 #[given("a profile directory containing:")]
@@ -1053,6 +1098,76 @@ async fn archive_exists_in_weekly_directory(world: &mut AcceptanceWorld, file: S
     assert_archive_exists_in_subdirectory(world, "weekly", &file, true);
 }
 
+#[then(expr = "{string} does not exist in the cloud daily directory")]
+async fn archive_missing_in_cloud_daily(world: &mut AcceptanceWorld, file: String) {
+    let cloud = world
+        .cloud_backup_dir
+        .as_ref()
+        .expect("cloud backup dir should be configured");
+    assert!(
+        !cloud.join("daily").join(file).exists(),
+        "expected cloud daily archive to be pruned"
+    );
+}
+
+#[then(expr = "{string} does not exist in the cloud weekly directory")]
+async fn archive_missing_in_cloud_weekly(world: &mut AcceptanceWorld, file: String) {
+    let cloud = world
+        .cloud_backup_dir
+        .as_ref()
+        .expect("cloud backup dir should be configured");
+    assert!(
+        !cloud.join("weekly").join(file).exists(),
+        "expected cloud weekly archive to be pruned"
+    );
+}
+
+#[then("no warning about missing config is logged")]
+async fn no_warning_about_missing_config(world: &mut AcceptanceWorld) {
+    assert!(
+        !world.stderr.to_lowercase().contains("missing"),
+        "unexpected missing-config warning: {}",
+        world.stderr
+    );
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let log_path = backup_dir.join("backup.log");
+    if log_path.exists() {
+        let content = fs::read_to_string(log_path)
+            .unwrap_or_default()
+            .to_lowercase();
+        assert!(
+            !content.contains("missing"),
+            "unexpected missing-config warning in backup.log"
+        );
+    }
+}
+
+#[then("no errors are logged")]
+async fn no_errors_logged(world: &mut AcceptanceWorld) {
+    assert!(
+        !world.stderr.to_lowercase().contains("error"),
+        "unexpected error output: {}",
+        world.stderr
+    );
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let log_path = backup_dir.join("backup.log");
+    if log_path.exists() {
+        let content = fs::read_to_string(log_path)
+            .unwrap_or_default()
+            .to_lowercase();
+        assert!(
+            !content.contains("error"),
+            "unexpected error in backup.log: {content}"
+        );
+    }
+}
+
 #[then(expr = "{string} does not exist")]
 async fn archive_does_not_exist(world: &mut AcceptanceWorld, file: String) {
     let backup_dir = world
@@ -1324,6 +1439,13 @@ async fn main() {
                 "Daily archives older than retention period are deleted"
                     | "Daily archives within retention period are preserved"
                     | "Weekly archives older than retention period are deleted"
+                    | "Custom retention periods are respected"
+                    | "Default retention periods are used when not configured"
+                    | "Missing config values fall back to defaults silently"
+                    | "Cloud daily directory is also pruned"
+                    | "Cloud weekly directory is also pruned"
+                    | "Retention does not delete other file types"
+                    | "Retention handles empty directory gracefully"
             )
     })
     .await;
@@ -1691,6 +1813,40 @@ fn backup_directory_contains_type_archives(world: &mut AcceptanceWorld, step: &S
             continue;
         }
         fs::write(target_dir.join(file), b"archive").expect("failed to seed archive");
+    }
+}
+
+fn cloud_directory_contains_type_archives(world: &mut AcceptanceWorld, step: &Step, kind: &str) {
+    ensure_backup_workspace(world);
+    if world.cloud_backup_dir.is_none() {
+        let workspace = ensure_workspace(world);
+        let cloud_dir = workspace.join("cloud-backups");
+        fs::create_dir_all(&cloud_dir).expect("failed to create cloud backup dir");
+        world.cloud_backup_dir = Some(cloud_dir.clone());
+        world.config_overrides.insert(
+            "backup.cloud_path".to_string(),
+            cloud_dir.display().to_string(),
+        );
+        rewrite_settings_from_world(world);
+    }
+    let cloud_dir = world
+        .cloud_backup_dir
+        .as_ref()
+        .expect("cloud backup dir should be configured");
+    let target_dir = cloud_dir.join(kind);
+    fs::create_dir_all(&target_dir).expect("failed to create cloud archive subdirectory");
+
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let file_index = *headers.get("file").expect("missing file column");
+    for row in table.rows.iter().skip(1) {
+        let file = row[file_index].trim();
+        if file.is_empty() {
+            continue;
+        }
+        fs::write(target_dir.join(file), b"archive").expect("failed to seed cloud archive");
     }
 }
 
