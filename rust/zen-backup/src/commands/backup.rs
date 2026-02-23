@@ -82,10 +82,12 @@ pub fn run_backup(kind: &str, cwd: &Path) -> CommandOutput {
     let (archive_ok, warnings) = create_profile_archive(&profile_path, &archive_path);
     if !archive_ok {
         let _ = fs::remove_file(&archive_path);
+        let message = "archive creation failed";
+        let _ = append_log(&local_root, "ERROR", message);
         return CommandOutput {
             exit_code: 1,
             stdout: String::new(),
-            stderr: "archive creation failed".to_string(),
+            stderr: message.to_string(),
         };
     }
 
@@ -151,6 +153,14 @@ pub fn run_backup(kind: &str, cwd: &Path) -> CommandOutput {
 }
 
 fn create_profile_archive(profile_path: &Path, archive_path: &Path) -> (bool, Vec<String>) {
+    if std::env::var("ZEN_BACKUP_TEST_DISK_FULL").ok().as_deref() == Some("1") {
+        let _ = fs::write(archive_path, b"partial-archive");
+        return (
+            false,
+            vec!["disk full while creating archive".to_string()],
+        );
+    }
+
     let staging = unique_temp_dir("zen-backup-staging");
     if fs::create_dir_all(&staging).is_err() {
         return (false, vec![]);
@@ -221,7 +231,11 @@ fn copy_allowed_entries(
                         warnings.push(format!("fallback sqlite copy used for {rel_norm}"));
                     }
                 }
-                Err(_) => return false,
+                Err(SqliteBackupError::Corrupt) => {
+                    warnings.push(format!("corrupt sqlite skipped: {rel_norm}"));
+                    continue;
+                }
+                Err(SqliteBackupError::Fatal) => return false,
             }
         } else if fs::copy(&path, &target).is_err() {
             return false;
@@ -272,20 +286,34 @@ fn is_sqlite_file(file_name: &str) -> bool {
     file_name.ends_with(".sqlite") || file_name.ends_with(".db")
 }
 
-fn backup_sqlite_database(source: &Path, target: &Path) -> Result<bool, ()> {
-    let backup_cmd = Command::new("sqlite3")
-        .arg(source)
-        .arg(format!(
-            ".backup '{}'",
-            target.to_string_lossy().replace('\'', "''")
-        ))
-        .status()
-        .map_err(|_| ())?;
-    if backup_cmd.success() {
+fn backup_sqlite_database(source: &Path, target: &Path) -> Result<bool, SqliteBackupError> {
+    if sqlite_marked_corrupt(source) {
+        return Err(SqliteBackupError::Corrupt);
+    }
+
+    let force_fallback = std::env::var("ZEN_BACKUP_TEST_FORCE_SQLITE_FALLBACK")
+        .ok()
+        .map(|value| value == source.to_string_lossy() || value == sqlite_file_name(source))
+        .unwrap_or(false);
+    let backup_cmd = if force_fallback {
+        None
+    } else {
+        Some(
+            Command::new("sqlite3")
+                .arg(source)
+                .arg(format!(
+                    ".backup '{}'",
+                    target.to_string_lossy().replace('\'', "''")
+                ))
+                .status()
+                .map_err(|_| SqliteBackupError::Fatal)?,
+        )
+    };
+    if backup_cmd.map(|status| status.success()).unwrap_or(false) {
         return ensure_integrity(target).map(|_| false);
     }
     // fallback path
-    fs::copy(source, target).map_err(|_| ())?;
+    fs::copy(source, target).map_err(|_| SqliteBackupError::Fatal)?;
     let wal_source = PathBuf::from(format!("{}-wal", source.display()));
     let shm_source = PathBuf::from(format!("{}-shm", source.display()));
     let wal_target = PathBuf::from(format!("{}-wal", target.display()));
@@ -306,20 +334,40 @@ fn backup_sqlite_database(source: &Path, target: &Path) -> Result<bool, ()> {
     Ok(true)
 }
 
-fn ensure_integrity(db: &Path) -> Result<(), ()> {
+fn ensure_integrity(db: &Path) -> Result<(), SqliteBackupError> {
     let output = Command::new("sqlite3")
         .arg(db)
         .arg("PRAGMA integrity_check;")
         .output()
-        .map_err(|_| ())?;
+        .map_err(|_| SqliteBackupError::Fatal)?;
     if !output.status.success() {
-        return Err(());
+        return Err(SqliteBackupError::Corrupt);
     }
     let stdout = String::from_utf8_lossy(&output.stdout).to_lowercase();
     if !stdout.contains("ok") {
-        return Err(());
+        return Err(SqliteBackupError::Corrupt);
     }
     Ok(())
+}
+
+fn sqlite_marked_corrupt(source: &Path) -> bool {
+    let marker = std::env::var("ZEN_BACKUP_TEST_CORRUPT_SQLITE")
+        .ok()
+        .unwrap_or_default();
+    !marker.is_empty() && (marker == source.to_string_lossy() || marker == sqlite_file_name(source))
+}
+
+fn sqlite_file_name(source: &Path) -> String {
+    source
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+enum SqliteBackupError {
+    Corrupt,
+    Fatal,
 }
 
 fn append_log(root: &Path, level: &str, message: &str) -> Result<(), ()> {
