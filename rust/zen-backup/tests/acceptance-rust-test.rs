@@ -238,6 +238,26 @@ async fn zen_browser_not_running(world: &mut AcceptanceWorld) {
     world.env.remove("ZEN_BACKUP_BROWSER_RUNNING");
 }
 
+#[given("the backup tool is installed")]
+async fn backup_tool_installed(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let profile_dir = workspace
+        .join("Library")
+        .join("Application Support")
+        .join("zen")
+        .join("Profiles")
+        .join("default");
+    fs::create_dir_all(&profile_dir).expect("failed to create detected profile path");
+    run_command(world, "install");
+    assert_eq!(world.exit_code, 0, "install failed: {}", world.stderr);
+}
+
+#[given(expr = "{string} was run")]
+async fn command_was_run(world: &mut AcceptanceWorld, command: String) {
+    run_command(world, &command);
+    assert_eq!(world.exit_code, 0, "command failed: {}", world.stderr);
+}
+
 #[when("the status command is run")]
 async fn run_status(world: &mut AcceptanceWorld) {
     run_command(world, "status");
@@ -261,6 +281,11 @@ async fn backup_weekly(world: &mut AcceptanceWorld) {
 #[when(expr = "restore is run with archive {string}")]
 async fn restore_with_archive(world: &mut AcceptanceWorld, archive_name: String) {
     run_command(world, &format!("restore {archive_name}"));
+}
+
+#[when(expr = "{string} is run")]
+async fn quoted_command_run(world: &mut AcceptanceWorld, command: String) {
+    run_command(world, &command);
 }
 
 #[when("the configuration is loaded")]
@@ -451,6 +476,15 @@ async fn stdout_contains_archive_path(world: &mut AcceptanceWorld) {
     );
 }
 
+#[then(expr = "stdout lists {string}")]
+async fn stdout_lists(world: &mut AcceptanceWorld, value: String) {
+    assert!(
+        world.stdout.contains(&value),
+        "expected stdout to list `{value}`, got `{}`",
+        world.stdout
+    );
+}
+
 #[tokio::main]
 async fn main() {
     let list_feature =
@@ -489,6 +523,19 @@ async fn main() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/features/core/restore.feature");
     AcceptanceWorld::filter_run(restore_feature, |feature, _, scenario| {
         feature.name == "Restore" && scenario.name == "Restore from a daily backup"
+    })
+    .await;
+
+    let scheduling_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/features/platform/scheduling.feature");
+    AcceptanceWorld::filter_run(scheduling_feature, |feature, _, scenario| {
+        feature.name == "Scheduling"
+            && matches!(
+                scenario.name.as_str(),
+                "Schedule status reports daily and weekly states"
+                    | "Schedule stop disables scheduled jobs without uninstalling"
+                    | "Schedule start enables paused jobs"
+            )
     })
     .await;
 }
@@ -535,7 +582,11 @@ fn write_settings(workspace: &Path, backup_dir: &Path) {
 
 fn run_command(world: &mut AcceptanceWorld, command: &str) {
     let workspace = world.workspace.as_ref().expect("workspace not initialized");
-    let args: Vec<&str> = command.split_whitespace().collect();
+    let normalized = command
+        .strip_prefix("zen-backup ")
+        .unwrap_or(command)
+        .trim();
+    let args: Vec<&str> = normalized.split_whitespace().collect();
     let output = Command::new(resolve_cli_path())
         .args(&args)
         .current_dir(workspace.path())
