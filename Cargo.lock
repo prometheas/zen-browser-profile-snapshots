@@ -1567,6 +1567,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cucumber",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",

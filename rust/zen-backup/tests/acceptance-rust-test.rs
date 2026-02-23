@@ -18,6 +18,7 @@ struct AcceptanceWorld {
     pending_restore_archive: Option<PathBuf>,
     tracked_backup_archives: Vec<PathBuf>,
     config_overrides: HashMap<String, String>,
+    configured_missing_profile_path: Option<PathBuf>,
     stdout: String,
     stderr: String,
     exit_code: i32,
@@ -372,6 +373,25 @@ async fn settings_toml_exists(world: &mut AcceptanceWorld) {
     }
 }
 
+#[given("the configured profile path does not exist")]
+async fn configured_profile_path_missing(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let missing_profile = workspace.join("profile-does-not-exist");
+    let backup_dir = workspace.join("backups");
+    fs::create_dir_all(&backup_dir).expect("failed to create backup dir");
+    world.backup_dir = Some(backup_dir.clone());
+    world.configured_missing_profile_path = Some(missing_profile.clone());
+
+    let config_dir = workspace.join(".config/zen-profile-backup");
+    fs::create_dir_all(&config_dir).expect("failed to create config dir");
+    let config_body = format!(
+        "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
+        missing_profile.display(),
+        backup_dir.display()
+    );
+    fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+}
+
 #[when("the status command is run")]
 async fn run_status(world: &mut AcceptanceWorld) {
     run_command(world, "status");
@@ -392,6 +412,11 @@ async fn backup_daily(world: &mut AcceptanceWorld) {
 async fn backup_weekly(world: &mut AcceptanceWorld) {
     ensure_backup_workspace(world);
     run_command(world, "backup weekly");
+}
+
+#[when("a daily backup is attempted")]
+async fn backup_daily_attempted(world: &mut AcceptanceWorld) {
+    run_command(world, "backup daily");
 }
 
 #[when(expr = "restore is run with archive {string}")]
@@ -708,6 +733,68 @@ async fn settings_toml_missing(world: &mut AcceptanceWorld) {
     );
 }
 
+#[then("stderr contains the missing path")]
+async fn stderr_contains_missing_path(world: &mut AcceptanceWorld) {
+    let expected = world
+        .configured_missing_profile_path
+        .as_ref()
+        .expect("missing profile path should be configured")
+        .display()
+        .to_string();
+    assert!(
+        world.stderr.contains(&expected),
+        "expected stderr to contain missing path `{expected}`, got `{}`",
+        world.stderr
+    );
+}
+
+#[then("no archive is created")]
+async fn no_archive_created(world: &mut AcceptanceWorld) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    for kind in ["daily", "weekly"] {
+        let kind_dir = backup_dir.join(kind);
+        if !kind_dir.exists() {
+            continue;
+        }
+        let entries = fs::read_dir(&kind_dir).expect("failed to read archive directory");
+        let has_archives = entries
+            .filter_map(Result::ok)
+            .any(|entry| entry.path().extension().map(|v| v == "gz").unwrap_or(false));
+        assert!(
+            !has_archives,
+            "expected no archive files in {}",
+            kind_dir.display()
+        );
+    }
+}
+
+#[then(expr = "{string} contains a line matching {string}")]
+async fn file_contains_line_matching(
+    world: &mut AcceptanceWorld,
+    file_name: String,
+    pattern: String,
+) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let path = backup_dir.join(file_name);
+    let content = fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!("expected log file to exist: {}", path.display());
+    });
+    let regex = regex::Regex::new(&pattern).expect("invalid regex pattern");
+    let found = content.lines().any(|line| regex.is_match(line));
+    assert!(
+        found,
+        "expected a line matching `{pattern}` in {}, got:\n{}",
+        path.display(),
+        content
+    );
+}
+
 #[tokio::main]
 async fn main() {
     let list_feature =
@@ -737,7 +824,10 @@ async fn main() {
         feature.name == "Backup"
             && matches!(
                 scenario.name.as_str(),
-                "Create a daily backup manually" | "Create a weekly backup manually"
+                "Create a daily backup manually"
+                    | "Create a weekly backup manually"
+                    | "Warning logged when browser is running"
+                    | "Error when profile directory does not exist"
             )
     })
     .await;
