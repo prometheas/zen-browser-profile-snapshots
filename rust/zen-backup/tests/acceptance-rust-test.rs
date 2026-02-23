@@ -19,6 +19,7 @@ struct AcceptanceWorld {
     tracked_backup_archives: Vec<PathBuf>,
     config_overrides: HashMap<String, String>,
     configured_missing_profile_path: Option<PathBuf>,
+    profile_snapshot_before_restore: HashMap<String, Vec<u8>>,
     stdout: String,
     stderr: String,
     exit_code: i32,
@@ -280,6 +281,27 @@ async fn zen_browser_running(world: &mut AcceptanceWorld) {
     world
         .env
         .insert("ZEN_BACKUP_BROWSER_RUNNING".to_string(), "1".to_string());
+    if world.profile_dir.is_some() {
+        capture_profile_snapshot(world);
+    }
+}
+
+#[given(expr = "a corrupted archive {string} exists")]
+async fn corrupted_archive_exists(world: &mut AcceptanceWorld, archive_name: String) {
+    let workspace = ensure_workspace(world);
+    let profile_dir = workspace.join("profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create profile dir");
+    world.profile_dir = Some(profile_dir.clone());
+
+    let backup_dir = workspace.join("backups");
+    let daily_dir = backup_dir.join("daily");
+    fs::create_dir_all(&daily_dir).expect("failed to create daily dir");
+    world.backup_dir = Some(backup_dir.clone());
+
+    let archive_path = daily_dir.join(archive_name);
+    fs::write(&archive_path, b"not a valid archive").expect("failed to write corrupted archive");
+    world.pending_restore_archive = Some(archive_path);
+    write_settings_for_profile(world, &workspace, &profile_dir, &backup_dir);
 }
 
 #[given("GitHub CLI is available")]
@@ -421,6 +443,11 @@ async fn backup_daily_attempted(world: &mut AcceptanceWorld) {
 
 #[when(expr = "restore is run with archive {string}")]
 async fn restore_with_archive(world: &mut AcceptanceWorld, archive_name: String) {
+    run_command(world, &format!("restore {archive_name}"));
+}
+
+#[when(expr = "restore is attempted with archive {string}")]
+async fn restore_attempted_with_archive(world: &mut AcceptanceWorld, archive_name: String) {
     run_command(world, &format!("restore {archive_name}"));
 }
 
@@ -641,6 +668,23 @@ async fn stdout_contains_archive_path(world: &mut AcceptanceWorld) {
     );
 }
 
+#[then("the profile directory is unchanged")]
+async fn profile_directory_is_unchanged(world: &mut AcceptanceWorld) {
+    assert!(
+        !world.profile_snapshot_before_restore.is_empty(),
+        "profile snapshot should be captured before restore attempt"
+    );
+    let profile_dir = world
+        .profile_dir
+        .as_ref()
+        .expect("profile dir should be configured");
+    let current = snapshot_directory(profile_dir);
+    assert_eq!(
+        current, world.profile_snapshot_before_restore,
+        "profile directory changed unexpectedly"
+    );
+}
+
 #[then(expr = "stdout lists {string}")]
 async fn stdout_lists(world: &mut AcceptanceWorld, value: String) {
     assert!(
@@ -835,7 +879,13 @@ async fn main() {
     let restore_feature =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/features/core/restore.feature");
     AcceptanceWorld::filter_run(restore_feature, |feature, _, scenario| {
-        feature.name == "Restore" && scenario.name == "Restore from a daily backup"
+        feature.name == "Restore"
+            && matches!(
+                scenario.name.as_str(),
+                "Restore from a daily backup"
+                    | "Restore is blocked when Zen browser is running"
+                    | "Error identifies the corrupted archive"
+            )
     })
     .await;
 
@@ -1122,6 +1172,41 @@ fn write_settings_for_profile(
         }
     }
     fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+}
+
+fn capture_profile_snapshot(world: &mut AcceptanceWorld) {
+    let profile_dir = world
+        .profile_dir
+        .as_ref()
+        .expect("profile dir should be configured before snapshot");
+    world.profile_snapshot_before_restore = snapshot_directory(profile_dir);
+}
+
+fn snapshot_directory(root: &Path) -> HashMap<String, Vec<u8>> {
+    let mut out = HashMap::new();
+    if !root.exists() {
+        return out;
+    }
+    collect_files(root, root, &mut out);
+    out
+}
+
+fn collect_files(base: &Path, current: &Path, out: &mut HashMap<String, Vec<u8>>) {
+    let entries = fs::read_dir(current).expect("failed to read directory for snapshot");
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_files(base, &path, out);
+            continue;
+        }
+        let relative = path
+            .strip_prefix(base)
+            .expect("path should be relative to base")
+            .to_string_lossy()
+            .to_string();
+        let content = fs::read(&path).expect("failed to read file for snapshot");
+        out.insert(relative, content);
+    }
 }
 
 fn apply_configuration_assignment(world: &mut AcceptanceWorld, assignment: &str) {
