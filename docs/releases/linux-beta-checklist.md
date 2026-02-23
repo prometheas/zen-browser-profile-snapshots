@@ -21,7 +21,7 @@ Run from repo root:
 - `deno task typecheck`
 - `deno task test:unit`
 - `deno task test:integration`
-- `deno task test:acceptance:platform:linux`
+- `deno task test:acceptance:rust`
 - `deno task release:linux`
 
 ## CI Gate

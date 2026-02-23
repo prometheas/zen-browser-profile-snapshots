@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This repo currently contains product specs only. When implementing, keep behavior consistent with
-the docs in `docs/`.
+This repo contains an implemented cross-platform CLI plus product/spec docs. Keep runtime behavior
+and documentation synchronized with `docs/`.
 
 ## Product Summary
 
@@ -14,19 +14,22 @@ copy).
 
 ## Stack Direction (Expected)
 
-- Language: TypeScript
-- Runtime: Node.js
+- Language: Rust (runtime), TypeScript (tooling/tests)
+- Runtime: Native Rust binary (`rust/zen-backup`)
 - Output: Single self-contained binary per platform (macOS/Windows/Linux)
-- Platform adapters: launchd/systemd/Task Scheduler; osascript/notify-send/PowerShell toast
+- Tooling: Deno tasks/scripts for testing, release automation, and developer workflows
+- Platform adapters: launchd/systemd/Task Scheduler;
+  terminal-notifier/osascript/notify-send/PowerShell toast
 
 ## Repo Organization (Target Layout)
 
+- `rust/zen-backup/` (runtime implementation and acceptance harness)
 - `src/`
+- `src/bridge/`
 - `src/cli/`
-- `src/platform/macos/`
-- `src/platform/linux/`
-- `src/platform/windows/`
-- `src/sqlite/`
+- `src/platform/`
+- `src/release/`
+- `scripts/`
 - `resources/`
 - `tests/`
 

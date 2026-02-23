@@ -39,8 +39,5 @@ jobs:
           cargo clippy -p zen-backup -- -D warnings
           cargo test -p zen-backup
 
-      - name: Linux acceptance (platform)
-        run: deno task test:acceptance:platform:linux
-
       - name: Rust acceptance suite
         run: deno task test:acceptance:rust

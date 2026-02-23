@@ -56,7 +56,6 @@ jobs:
           deno task typecheck
           deno task test:unit
           deno task test:integration
-          deno task test:acceptance:m1
           deno task test:acceptance:rust
 
       - name: Build macOS artifacts
@@ -113,7 +112,6 @@ jobs:
           deno task typecheck
           deno task test:unit
           deno task test:integration
-          deno task test:acceptance:platform:linux
           deno task test:acceptance:rust
 
       - name: Build Linux artifacts
@@ -160,7 +158,6 @@ jobs:
           deno task typecheck
           deno task test:unit
           deno task test:integration
-          deno task test:acceptance:platform:windows
           deno task test:acceptance:rust
           $env:ZEN_BACKUP_LIVE_SMOKE = "1"
           deno task test:smoke:windows:scheduler
