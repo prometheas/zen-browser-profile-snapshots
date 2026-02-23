@@ -39,6 +39,7 @@ jobs:
           cargo clippy -p zen-backup -- -D warnings
           cargo test -p zen-backup
           deno task test:acceptance:platform:windows
+          deno task test:acceptance:rust
 
       - name: Windows native scheduler smoke
         shell: pwsh
