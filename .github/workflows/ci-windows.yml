@@ -35,6 +35,8 @@ jobs:
           deno task typecheck
           deno task test:unit
           deno task test:integration
+          cargo fmt --check
+          cargo clippy -p zen-backup -- -D warnings
           cargo test -p zen-backup
           deno task test:acceptance:platform:windows
 

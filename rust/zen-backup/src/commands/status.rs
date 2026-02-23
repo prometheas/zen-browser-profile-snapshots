@@ -45,7 +45,9 @@ pub fn run_status(cwd: &Path) -> CommandOutput {
 
             let backup_dir = Path::new(&config.backup_local_path);
             if !backup_dir.exists() {
-                lines.push("Backup directory not found. Run a backup or check configuration.".to_string());
+                lines.push(
+                    "Backup directory not found. Run a backup or check configuration.".to_string(),
+                );
                 return CommandOutput {
                     exit_code: 0,
                     stdout: lines.join("\n"),
@@ -70,13 +72,25 @@ pub fn run_status(cwd: &Path) -> CommandOutput {
             lines.push(
                 latest_daily
                     .as_ref()
-                    .map(|entry| format!("Latest daily: {} ({})", entry.name, format_size(entry.size_bytes)))
+                    .map(|entry| {
+                        format!(
+                            "Latest daily: {} ({})",
+                            entry.name,
+                            format_size(entry.size_bytes)
+                        )
+                    })
                     .unwrap_or_else(|| "No daily backups yet".to_string()),
             );
             lines.push(
                 latest_weekly
                     .as_ref()
-                    .map(|entry| format!("Latest weekly: {} ({})", entry.name, format_size(entry.size_bytes)))
+                    .map(|entry| {
+                        format!(
+                            "Latest weekly: {} ({})",
+                            entry.name,
+                            format_size(entry.size_bytes)
+                        )
+                    })
                     .unwrap_or_else(|| "No weekly backups yet".to_string()),
             );
 

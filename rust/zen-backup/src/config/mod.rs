@@ -106,9 +106,9 @@ pub fn load_config(required: bool, cwd: &Path) -> Result<Option<AppConfig>, Conf
     let profile_path = parsed
         .profile
         .and_then(|v| v.path)
-        .unwrap_or_else(|| default_profile_path());
+        .unwrap_or_else(default_profile_path);
     let backup = parsed.backup.unwrap_or_default();
-    let backup_local_path = backup.local_path.unwrap_or_else(|| default_backup_path());
+    let backup_local_path = backup.local_path.unwrap_or_else(default_backup_path);
     let schedule = parsed.schedule.unwrap_or_default();
     let notifications = parsed.notifications.unwrap_or_default();
 

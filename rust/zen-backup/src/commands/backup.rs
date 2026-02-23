@@ -65,11 +65,7 @@ pub fn run_backup(kind: &str, cwd: &Path) -> CommandOutput {
         };
     }
 
-    if std::env::var("ZEN_BACKUP_BROWSER_RUNNING")
-        .ok()
-        .as_deref()
-        == Some("1")
-    {
+    if std::env::var("ZEN_BACKUP_BROWSER_RUNNING").ok().as_deref() == Some("1") {
         let message =
             "browser is running; SQLite databases are safely backed up, but session files may be mid-write";
         let _ = append_log(&local_root, "WARNING", message);

@@ -41,11 +41,19 @@ pub fn run_list(cwd: &Path) -> CommandOutput {
 
             let mut lines = vec!["daily:".to_string()];
             for entry in daily {
-                lines.push(format!("  {} ({})", entry.name, format_size(entry.size_bytes)));
+                lines.push(format!(
+                    "  {} ({})",
+                    entry.name,
+                    format_size(entry.size_bytes)
+                ));
             }
             lines.push("weekly:".to_string());
             for entry in weekly {
-                lines.push(format!("  {} ({})", entry.name, format_size(entry.size_bytes)));
+                lines.push(format!(
+                    "  {} ({})",
+                    entry.name,
+                    format_size(entry.size_bytes)
+                ));
             }
 
             CommandOutput {
