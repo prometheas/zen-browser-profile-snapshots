@@ -68,7 +68,7 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - `deno task test:integration`
   - relevant acceptance subset for your platform/scope
   - when feedback/debug behavior changes:
-    - `deno test -A tests/unit/feedback-command-test.ts tests/unit/browser-open-test.ts tests/unit/global-options-test.ts tests/unit/debug-logger-test.ts`
+    - `deno test -A tests/unit/global-options-test.ts tests/unit/debug-logger-test.ts`
     - `deno test -A tests/integration/feedback-cli-test.ts`
 - Before macOS beta cut:
   - `deno task test:acceptance:platform:macos`
