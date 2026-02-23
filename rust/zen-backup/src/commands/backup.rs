@@ -1,5 +1,6 @@
 use crate::config::{load_config, ConfigError};
 use crate::core::archive_naming::build_archive_name;
+use chrono::{DateTime, SecondsFormat, Utc};
 use std::ffi::OsStr;
 use std::fs;
 use std::io::Write;
@@ -41,6 +42,12 @@ pub fn run_backup(kind: &str, cwd: &Path) -> CommandOutput {
 
     let profile_path = PathBuf::from(&config.profile_path);
     if !profile_path.exists() {
+        let _ = emit_notification(
+            &local_notification_root(&config.backup_local_path),
+            config.notifications_enabled,
+            "Zen Backup Error",
+            &format!("profile path not found: {}", config.profile_path),
+        );
         return CommandOutput {
             exit_code: 1,
             stdout: String::new(),
@@ -56,6 +63,22 @@ pub fn run_backup(kind: &str, cwd: &Path) -> CommandOutput {
             stdout: String::new(),
             stderr: format!("failed to create backup directory: {err}"),
         };
+    }
+
+    if std::env::var("ZEN_BACKUP_BROWSER_RUNNING")
+        .ok()
+        .as_deref()
+        == Some("1")
+    {
+        let message =
+            "browser is running; SQLite databases are safely backed up, but session files may be mid-write";
+        let _ = append_log(&local_root, "WARNING", message);
+        let _ = emit_notification(
+            &local_root,
+            config.notifications_enabled,
+            "Zen Backup",
+            message,
+        );
     }
 
     let now = now_iso_date();
@@ -98,11 +121,23 @@ pub fn run_backup(kind: &str, cwd: &Path) -> CommandOutput {
                 exit_code = 1;
                 stderr = "cloud sync failed: failed to copy archive".to_string();
                 let _ = append_log(&local_root, "ERROR", &stderr);
+                let _ = emit_notification(
+                    &local_root,
+                    config.notifications_enabled,
+                    "Zen Backup Warning",
+                    &stderr,
+                );
             }
         } else {
             exit_code = 1;
             stderr = "cloud sync failed: failed to create cloud backup directory".to_string();
             let _ = append_log(&local_root, "ERROR", &stderr);
+            let _ = emit_notification(
+                &local_root,
+                config.notifications_enabled,
+                "Zen Backup Warning",
+                &stderr,
+            );
         }
     }
 
@@ -374,16 +409,11 @@ fn now_iso_date() -> String {
     if let Ok(v) = std::env::var("ZEN_BACKUP_TEST_NOW") {
         return v.chars().take(10).collect();
     }
-    now_iso_timestamp().chars().take(10).collect()
+    now_utc().format("%Y-%m-%d").to_string()
 }
 
 fn now_iso_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|v| v.as_secs())
-        .unwrap_or(0);
-    format!("{secs}")
+    now_utc().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -393,4 +423,32 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .map(|v| v.as_nanos())
         .unwrap_or(0);
     std::env::temp_dir().join(format!("{prefix}-{nanos}"))
+}
+
+fn now_utc() -> DateTime<Utc> {
+    if let Ok(raw) = std::env::var("ZEN_BACKUP_TEST_NOW") {
+        if let Ok(value) = DateTime::parse_from_rfc3339(&raw) {
+            return value.with_timezone(&Utc);
+        }
+    }
+    Utc::now()
+}
+
+fn emit_notification(root: &Path, enabled: bool, title: &str, message: &str) -> Result<(), ()> {
+    if !enabled {
+        return Ok(());
+    }
+    fs::create_dir_all(root).map_err(|_| ())?;
+    let log_path = root.join("notifications.log");
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .map_err(|_| ())?;
+    let line = format!("[{}] {}: {}\n", now_iso_timestamp(), title, message);
+    file.write_all(line.as_bytes()).map_err(|_| ())
+}
+
+fn local_notification_root(path: &str) -> PathBuf {
+    PathBuf::from(path)
 }
