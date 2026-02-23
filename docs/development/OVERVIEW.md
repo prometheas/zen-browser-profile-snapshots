@@ -32,6 +32,10 @@ This document is the entry point for contributor and agent-facing development wo
 
 Read `docs/development/TESTING.md` before adding or modifying tests.
 
+Runtime parity tracking:
+
+- `docs/development/rust-parity-matrix.md`
+
 ## Key Commands
 
 - Lint:
