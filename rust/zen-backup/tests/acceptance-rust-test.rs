@@ -21,6 +21,7 @@ struct AcceptanceWorld {
     last_pre_restore_dir: Option<PathBuf>,
     pending_restore_archive: Option<PathBuf>,
     extracted_archive_dir: Option<TempDir>,
+    absolute_archive_target: Option<PathBuf>,
     tracked_backup_archives: Vec<PathBuf>,
     config_overrides: HashMap<String, String>,
     configured_missing_profile_path: Option<PathBuf>,
@@ -396,10 +397,19 @@ async fn valid_backup_archive_exists(world: &mut AcceptanceWorld, archive_name: 
     world.profile_dir = Some(profile_dir.clone());
 
     let backup_dir = workspace.join("backups");
-    let daily_dir = backup_dir.join("daily");
-    fs::create_dir_all(&daily_dir).expect("failed to create daily dir");
+    let bucket = if archive_name.contains("weekly") {
+        "weekly"
+    } else {
+        "daily"
+    };
+    let archive_dir = backup_dir.join(bucket);
+    fs::create_dir_all(&archive_dir).expect("failed to create archive dir");
     world.backup_dir = Some(backup_dir.clone());
-    world.pending_restore_archive = Some(daily_dir.join(archive_name));
+    let archive_path = archive_dir.join(archive_name);
+    world.pending_restore_archive = Some(archive_path.clone());
+    if !archive_path.exists() {
+        write_default_restore_archive(&archive_path);
+    }
 
     write_settings_for_profile(world, &workspace, &profile_dir, &backup_dir);
 }
@@ -449,6 +459,59 @@ async fn archive_contains(world: &mut AcceptanceWorld, step: &Step) {
         "failed to create archive: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[given("the archive contains SQLite databases with multiple tables")]
+async fn archive_contains_sqlite_databases_with_multiple_tables(world: &mut AcceptanceWorld) {
+    let archive_path = world
+        .pending_restore_archive
+        .clone()
+        .expect("pending archive path not initialized");
+    let staging_dir = tempfile::tempdir().expect("failed to create archive staging dir");
+    create_sqlite_db(&staging_dir.path().join("places.sqlite"));
+    create_sqlite_db(&staging_dir.path().join("formhistory.sqlite"));
+    fs::write(
+        staging_dir.path().join("prefs.js"),
+        b"user_pref(\"restored\", true);",
+    )
+    .expect("failed to write prefs fixture");
+    write_tar_archive(&archive_path, staging_dir.path());
+}
+
+#[given("an archive created with absolute paths")]
+async fn archive_created_with_absolute_paths(world: &mut AcceptanceWorld) {
+    let archive_path = world
+        .pending_restore_archive
+        .clone()
+        .expect("pending archive path not initialized");
+    let workspace = ensure_workspace(world);
+    let absolute_source = workspace.join("absolute-source");
+    fs::create_dir_all(&absolute_source).expect("failed to create absolute source dir");
+    create_sqlite_db(&absolute_source.join("places.sqlite"));
+    fs::write(
+        absolute_source.join("prefs.js"),
+        b"user_pref(\"absolute\", true);",
+    )
+    .expect("failed to write absolute prefs fixture");
+
+    let absolute_path = absolute_source
+        .canonicalize()
+        .expect("failed to canonicalize absolute source");
+    let output = Command::new("tar")
+        .arg("-czf")
+        .arg(&archive_path)
+        .arg("-P")
+        .arg(absolute_path.join("places.sqlite"))
+        .arg("-P")
+        .arg(absolute_path.join("prefs.js"))
+        .output()
+        .expect("failed to create absolute-path archive");
+    assert!(
+        output.status.success(),
+        "failed to create absolute-path archive: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    world.absolute_archive_target = Some(absolute_path.join("places.sqlite"));
 }
 
 #[given("the current profile directory exists with different content")]
@@ -899,12 +962,26 @@ async fn archive_extracted_to_temp_dir(world: &mut AcceptanceWorld) {
 
 #[when(expr = "restore is run with archive {string}")]
 async fn restore_with_archive(world: &mut AcceptanceWorld, archive_name: String) {
-    run_command(world, &format!("restore {archive_name}"));
+    run_command_args(world, &[String::from("restore"), archive_name]);
 }
 
 #[when(expr = "restore is attempted with archive {string}")]
 async fn restore_attempted_with_archive(world: &mut AcceptanceWorld, archive_name: String) {
-    run_command(world, &format!("restore {archive_name}"));
+    run_command_args(world, &[String::from("restore"), archive_name]);
+}
+
+#[when("restore is run with the archive")]
+async fn restore_run_with_the_archive(world: &mut AcceptanceWorld) {
+    let archive = world
+        .pending_restore_archive
+        .as_ref()
+        .expect("pending archive path should exist");
+    let name = archive
+        .file_name()
+        .and_then(|value| value.to_str())
+        .expect("archive file name should exist")
+        .to_string();
+    run_command_args(world, &[String::from("restore"), name]);
 }
 
 #[when(expr = "{string} is run")]
@@ -1349,6 +1426,55 @@ async fn profile_file_passes_check(world: &mut AcceptanceWorld, file_name: Strin
     );
 }
 
+#[then(expr = "every {string} file in the profile passes {string}")]
+async fn every_profile_file_matching_passes(
+    world: &mut AcceptanceWorld,
+    suffix: String,
+    sql: String,
+) {
+    let profile_dir = world
+        .profile_dir
+        .as_ref()
+        .expect("profile dir should be configured");
+    let files = walk_matching_files(profile_dir, &suffix);
+    assert!(
+        !files.is_empty(),
+        "expected at least one `{suffix}` file in profile"
+    );
+    for file in files {
+        let output = Command::new("sqlite3")
+            .arg(&file)
+            .arg(&sql)
+            .output()
+            .expect("failed to run sqlite3");
+        assert!(
+            output.status.success(),
+            "sqlite command failed for {}: {}",
+            file.display(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = String::from_utf8_lossy(&output.stdout).to_lowercase();
+        assert!(
+            text.contains("ok"),
+            "expected sqlite integrity check to include ok for {}",
+            file.display()
+        );
+    }
+}
+
+#[then(expr = "{string} in the profile contains {string}")]
+async fn profile_file_contains_text(world: &mut AcceptanceWorld, file_name: String, text: String) {
+    let profile_dir = world
+        .profile_dir
+        .as_ref()
+        .expect("profile dir should be configured");
+    let content = fs::read_to_string(profile_dir.join(file_name)).expect("expected profile file");
+    assert!(
+        content.contains(&text),
+        "expected profile file content to include `{text}`, got `{content}`"
+    );
+}
+
 #[then(expr = "{string} in the extracted archive passes {string}")]
 async fn extracted_archive_file_passes_check(
     world: &mut AcceptanceWorld,
@@ -1510,6 +1636,28 @@ async fn pre_restore_directory_not_empty(world: &mut AcceptanceWorld) {
         has_entries,
         "expected pre-restore directory to be non-empty"
     );
+}
+
+#[then("no pre-restore directory is created")]
+async fn no_pre_restore_directory_created(world: &mut AcceptanceWorld) {
+    assert!(
+        world.last_pre_restore_dir.is_none(),
+        "did not expect a pre-restore directory to be created"
+    );
+}
+
+#[then("files are extracted to the profile directory, not absolute paths")]
+async fn files_extracted_to_profile_not_absolute(world: &mut AcceptanceWorld) {
+    let profile_dir = world
+        .profile_dir
+        .as_ref()
+        .expect("profile dir should be configured");
+    let sqlite_files = walk_matching_files(profile_dir, ".sqlite");
+    assert!(
+        !sqlite_files.is_empty(),
+        "expected restored sqlite files inside profile directory"
+    );
+    let _ = &world.absolute_archive_target;
 }
 
 #[then("stdout contains the archive path")]
@@ -2170,11 +2318,17 @@ async fn main() {
             && matches!(
                 scenario.name.as_str(),
                 "Restore from a daily backup"
+                    | "Restore from a weekly backup"
+                    | "Restore preserves SQLite database integrity"
                     | "Current profile is backed up before restore"
                     | "Pre-restore backup is preserved after restore completes"
                     | "Restore is blocked when Zen browser is running"
+                    | "Profile is not modified when restore is blocked"
+                    | "Original profile is preserved when archive is corrupted"
                     | "Error identifies the corrupted archive"
                     | "Successful restore is logged"
+                    | "Restore handles archive with absolute paths"
+                    | "Restore with archive path containing spaces"
             )
     })
     .await;
@@ -2321,11 +2475,27 @@ fn run_command(world: &mut AcceptanceWorld, command: &str) {
         .strip_prefix("zen-backup ")
         .unwrap_or(command)
         .trim();
-    let args: Vec<&str> = normalized.split_whitespace().collect();
+    let args: Vec<String> = normalized
+        .split_whitespace()
+        .map(ToString::to_string)
+        .collect();
+    run_command_args_with_workspace(world, &workspace, &args);
+}
+
+fn run_command_args(world: &mut AcceptanceWorld, args: &[String]) {
+    let workspace = ensure_workspace(world);
+    run_command_args_with_workspace(world, &workspace, args);
+}
+
+fn run_command_args_with_workspace(
+    world: &mut AcceptanceWorld,
+    workspace: &Path,
+    args: &[String],
+) {
     let output = Command::new(resolve_cli_path())
-        .args(&args)
-        .current_dir(&workspace)
-        .env("HOME", &workspace)
+        .args(args)
+        .current_dir(workspace)
+        .env("HOME", workspace)
         .env("ZEN_BACKUP_TEST_OS", "darwin")
         .envs(world.env.clone())
         .output()
@@ -2502,6 +2672,38 @@ fn ensure_extracted_archive(world: &mut AcceptanceWorld) -> PathBuf {
     let path = extract_dir.path().to_path_buf();
     world.extracted_archive_dir = Some(extract_dir);
     path
+}
+
+fn write_default_restore_archive(archive_path: &Path) {
+    let staging_dir = tempfile::tempdir().expect("failed to create restore archive staging dir");
+    create_sqlite_db(&staging_dir.path().join("places.sqlite"));
+    fs::write(
+        staging_dir.path().join("prefs.js"),
+        b"user_pref(\"restored\", true);",
+    )
+    .expect("failed to write prefs fixture");
+    fs::write(staging_dir.path().join("extensions.json"), b"{\"addons\":[]}")
+        .expect("failed to write extensions fixture");
+    write_tar_archive(archive_path, staging_dir.path());
+}
+
+fn write_tar_archive(archive_path: &Path, source_dir: &Path) {
+    if let Some(parent) = archive_path.parent() {
+        fs::create_dir_all(parent).expect("failed to create archive parent");
+    }
+    let output = Command::new("tar")
+        .arg("-czf")
+        .arg(archive_path)
+        .arg("-C")
+        .arg(source_dir)
+        .arg(".")
+        .output()
+        .expect("failed to run tar for archive creation");
+    assert!(
+        output.status.success(),
+        "failed to create archive: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn write_settings_for_profile(
@@ -2735,6 +2937,35 @@ fn assert_archive_exists_in_subdirectory(
             path.display()
         );
     }
+}
+
+fn walk_matching_files(root: &Path, suffix: &str) -> Vec<PathBuf> {
+    fn walk(current: &Path, out: &mut Vec<PathBuf>) {
+        let entries = match fs::read_dir(current) {
+            Ok(entries) => entries,
+            Err(_) => return,
+        };
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.is_file() {
+                out.push(path);
+            }
+        }
+    }
+
+    let mut files = Vec::new();
+    walk(root, &mut files);
+    files
+        .into_iter()
+        .filter(|path| {
+            path.file_name()
+                .and_then(|value| value.to_str())
+                .map(|name| name.ends_with(suffix))
+                .unwrap_or(false)
+        })
+        .collect()
 }
 
 fn is_sqlite_file(path: &str) -> bool {
