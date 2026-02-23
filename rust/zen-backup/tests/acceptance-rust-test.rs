@@ -17,6 +17,7 @@ struct AcceptanceWorld {
     last_archive: Option<PathBuf>,
     pending_restore_archive: Option<PathBuf>,
     tracked_backup_archives: Vec<PathBuf>,
+    config_overrides: HashMap<String, String>,
     stdout: String,
     stderr: String,
     exit_code: i32,
@@ -75,6 +76,29 @@ async fn config_file_default(world: &mut AcceptanceWorld, step: &Step) {
     fs::write(default_path, docstring(step)).expect("failed to write default config file");
 }
 
+#[given(expr = "the configuration has {string}")]
+async fn configuration_has_single(world: &mut AcceptanceWorld, assignment: String) {
+    apply_configuration_assignment(world, &assignment);
+}
+
+#[given("the configuration has:")]
+async fn configuration_has_table(world: &mut AcceptanceWorld, step: &Step) {
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let key_index = *headers.get("key").expect("missing key column");
+    let value_index = *headers.get("value").expect("missing value column");
+    for row in table.rows.iter().skip(1) {
+        let key = row[key_index].trim();
+        let value = row[value_index].trim();
+        if key.is_empty() {
+            continue;
+        }
+        apply_configuration_assignment(world, &format!("{key} = {value}"));
+    }
+}
+
 #[given("the backup directory contains:")]
 async fn backup_directory_contains(world: &mut AcceptanceWorld, step: &Step) {
     let workspace = ensure_workspace(world);
@@ -108,6 +132,16 @@ async fn backup_directory_contains(world: &mut AcceptanceWorld, step: &Step) {
             .unwrap_or(256);
         fs::write(path, vec![0_u8; size]).expect("failed to write archive file");
     }
+}
+
+#[given("the backup directory contains daily archives:")]
+async fn backup_directory_contains_daily_archives(world: &mut AcceptanceWorld, step: &Step) {
+    backup_directory_contains_type_archives(world, step, "daily");
+}
+
+#[given("the backup directory contains weekly archives:")]
+async fn backup_directory_contains_weekly_archives(world: &mut AcceptanceWorld, step: &Step) {
+    backup_directory_contains_type_archives(world, step, "weekly");
 }
 
 #[given("a profile directory containing:")]
@@ -154,7 +188,7 @@ async fn backup_directory_configured(world: &mut AcceptanceWorld) {
     fs::create_dir_all(&backup_dir).expect("failed to create backup dir");
     world.backup_dir = Some(backup_dir.clone());
 
-    write_settings_for_profile(&workspace, &profile_dir, &backup_dir);
+    write_settings_for_profile(world, &workspace, &profile_dir, &backup_dir);
 }
 
 #[given(expr = "a valid backup archive {string} exists")]
@@ -170,7 +204,7 @@ async fn valid_backup_archive_exists(world: &mut AcceptanceWorld, archive_name: 
     world.backup_dir = Some(backup_dir.clone());
     world.pending_restore_archive = Some(daily_dir.join(archive_name));
 
-    write_settings_for_profile(&workspace, &profile_dir, &backup_dir);
+    write_settings_for_profile(world, &workspace, &profile_dir, &backup_dir);
 }
 
 #[given("the archive contains:")]
@@ -639,6 +673,31 @@ async fn all_backup_archives_still_exist(world: &mut AcceptanceWorld) {
     }
 }
 
+#[then(expr = "{string} exists in the daily directory")]
+async fn archive_exists_in_daily_directory(world: &mut AcceptanceWorld, file: String) {
+    assert_archive_exists_in_subdirectory(world, "daily", &file, true);
+}
+
+#[then(expr = "{string} exists in the weekly directory")]
+async fn archive_exists_in_weekly_directory(world: &mut AcceptanceWorld, file: String) {
+    assert_archive_exists_in_subdirectory(world, "weekly", &file, true);
+}
+
+#[then(expr = "{string} does not exist")]
+async fn archive_does_not_exist(world: &mut AcceptanceWorld, file: String) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let daily = backup_dir.join("daily").join(&file);
+    let weekly = backup_dir.join("weekly").join(&file);
+    assert!(
+        !daily.exists() && !weekly.exists(),
+        "expected archive to be deleted: {}",
+        file
+    );
+}
+
 #[then("settings.toml does not exist")]
 async fn settings_toml_missing(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
@@ -734,6 +793,19 @@ async fn main() {
                 "Submit bug feedback via GitHub CLI"
                     | "Submit request feedback via GitHub CLI"
                     | "Fallback to browser when GitHub CLI is unavailable"
+            )
+    })
+    .await;
+
+    let retention_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/features/core/retention.feature");
+    AcceptanceWorld::filter_run(retention_feature, |feature, _, scenario| {
+        feature.name == "Retention"
+            && matches!(
+                scenario.name.as_str(),
+                "Daily archives older than retention period are deleted"
+                    | "Daily archives within retention period are preserved"
+                    | "Weekly archives older than retention period are deleted"
             )
     })
     .await;
@@ -854,7 +926,7 @@ fn ensure_backup_workspace(world: &mut AcceptanceWorld) {
     fs::create_dir_all(&backup_dir).expect("failed to create backup dir");
     world.backup_dir = Some(backup_dir.clone());
 
-    write_settings_for_profile(&workspace, &profile_dir, &backup_dir);
+    write_settings_for_profile(world, &workspace, &profile_dir, &backup_dir);
 }
 
 fn header_map(header: &[String]) -> HashMap<String, usize> {
@@ -907,15 +979,110 @@ fn extract_archive_path(stdout: &str) -> Option<PathBuf> {
     None
 }
 
-fn write_settings_for_profile(workspace: &Path, profile_dir: &Path, backup_dir: &Path) {
+fn write_settings_for_profile(
+    world: &AcceptanceWorld,
+    workspace: &Path,
+    profile_dir: &Path,
+    backup_dir: &Path,
+) {
     let config_dir = workspace.join(".config/zen-profile-backup");
     fs::create_dir_all(&config_dir).expect("failed to create config dir");
-    let config_body = format!(
+    let mut config_body = format!(
         "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
         profile_dir.display(),
         backup_dir.display(),
     );
+    if !world.config_overrides.is_empty() {
+        let mut section_keys: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
+        for (key, value) in &world.config_overrides {
+            let mut parts = key.splitn(2, '.');
+            if let (Some(section), Some(field)) = (parts.next(), parts.next()) {
+                section_keys
+                    .entry(section)
+                    .or_default()
+                    .push((field, value.as_str()));
+            }
+        }
+        let mut sections: Vec<&str> = section_keys.keys().copied().collect();
+        sections.sort_unstable();
+        for section in sections {
+            config_body.push_str(&format!("\n[{section}]\n"));
+            let mut fields = section_keys.remove(section).unwrap_or_default();
+            fields.sort_by(|a, b| a.0.cmp(b.0));
+            for (field, value) in fields {
+                if value.chars().all(|c| c.is_ascii_digit()) {
+                    config_body.push_str(&format!("{field} = {value}\n"));
+                } else {
+                    config_body.push_str(&format!("{field} = \"{value}\"\n"));
+                }
+            }
+        }
+    }
     fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+}
+
+fn apply_configuration_assignment(world: &mut AcceptanceWorld, assignment: &str) {
+    let Some((key_raw, value_raw)) = assignment.split_once('=') else {
+        panic!("invalid assignment: {assignment}");
+    };
+    let key = key_raw.trim();
+    let value = value_raw.trim().trim_matches('"');
+    world
+        .config_overrides
+        .insert(key.to_string(), value.to_string());
+    world.env.insert(
+        "ZEN_BACKUP_TEST_NOW".to_string(),
+        "2026-01-16T12:00:00Z".to_string(),
+    );
+}
+
+fn backup_directory_contains_type_archives(world: &mut AcceptanceWorld, step: &Step, kind: &str) {
+    ensure_backup_workspace(world);
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let target_dir = backup_dir.join(kind);
+    fs::create_dir_all(&target_dir).expect("failed to create archive subdirectory");
+
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let file_index = *headers.get("file").expect("missing file column");
+    for row in table.rows.iter().skip(1) {
+        let file = row[file_index].trim();
+        if file.is_empty() {
+            continue;
+        }
+        fs::write(target_dir.join(file), b"archive").expect("failed to seed archive");
+    }
+}
+
+fn assert_archive_exists_in_subdirectory(
+    world: &AcceptanceWorld,
+    subdirectory: &str,
+    file: &str,
+    should_exist: bool,
+) {
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let path = backup_dir.join(subdirectory).join(file);
+    if should_exist {
+        assert!(
+            path.exists(),
+            "expected archive to exist: {}",
+            path.display()
+        );
+    } else {
+        assert!(
+            !path.exists(),
+            "expected archive to be absent: {}",
+            path.display()
+        );
+    }
 }
 
 fn is_sqlite_file(path: &str) -> bool {
