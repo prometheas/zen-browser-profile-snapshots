@@ -4,10 +4,16 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
+use zen_backup::config::{load_config, AppConfig};
 
 #[derive(Debug, Default, cucumber::World)]
 struct AcceptanceWorld {
     workspace: Option<TempDir>,
+    env: HashMap<String, String>,
+    loaded_config: Option<AppConfig>,
+    profile_dir: Option<PathBuf>,
+    backup_dir: Option<PathBuf>,
+    last_archive: Option<PathBuf>,
     stdout: String,
     stderr: String,
     exit_code: i32,
@@ -16,6 +22,7 @@ struct AcceptanceWorld {
 #[given("no settings.toml file exists")]
 async fn no_settings_file(world: &mut AcceptanceWorld) {
     world.workspace = Some(tempfile::tempdir().expect("failed to create temp workspace"));
+    world.env.remove("ZEN_BACKUP_CONFIG");
 }
 
 #[given("the backup directory exists but contains no archives")]
@@ -32,6 +39,37 @@ async fn backup_directory_missing(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
     let backup_dir = workspace.join("missing-backups");
     write_settings(&workspace, &backup_dir);
+}
+
+#[given(expr = "the environment variable {string} is set to {string}")]
+async fn set_env_var(world: &mut AcceptanceWorld, key: String, value: String) {
+    world.env.insert(key, value);
+}
+
+#[given(expr = "the environment variable {string} is not set")]
+async fn unset_env_var(world: &mut AcceptanceWorld, key: String) {
+    world.env.remove(&key);
+}
+
+#[given(expr = "a config file exists at {string} containing:")]
+async fn config_file_at_path(world: &mut AcceptanceWorld, path: String, step: &Step) {
+    let workspace = ensure_workspace(world);
+    let file_path = workspace.join(path);
+    if let Some(parent) = file_path.parent() {
+        fs::create_dir_all(parent).expect("failed to create config parent");
+    }
+    fs::write(file_path, docstring(step)).expect("failed to write config file");
+}
+
+#[given("a config file containing:")]
+#[given("the config file contains:")]
+async fn config_file_default(world: &mut AcceptanceWorld, step: &Step) {
+    let workspace = ensure_workspace(world);
+    let default_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    if let Some(parent) = default_path.parent() {
+        fs::create_dir_all(parent).expect("failed to create default config parent");
+    }
+    fs::write(default_path, docstring(step)).expect("failed to write default config file");
 }
 
 #[given("the backup directory contains:")]
@@ -69,6 +107,53 @@ async fn backup_directory_contains(world: &mut AcceptanceWorld, step: &Step) {
     }
 }
 
+#[given("a profile directory containing:")]
+async fn profile_directory_contains(world: &mut AcceptanceWorld, step: &Step) {
+    let workspace = ensure_workspace(world);
+    let profile_dir = workspace.join("profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create profile dir");
+    world.profile_dir = Some(profile_dir.clone());
+
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let file_index = *headers.get("file").expect("missing file column");
+
+    for row in table.rows.iter().skip(1) {
+        let file = row[file_index].trim();
+        if file.is_empty() {
+            continue;
+        }
+        let path = profile_dir.join(file);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("failed to create parent path");
+        }
+        if is_sqlite_file(file) {
+            create_sqlite_db(&path);
+        } else {
+            fs::write(path, b"fixture").expect("failed to write fixture file");
+        }
+    }
+}
+
+#[given("a backup directory exists at the configured path")]
+async fn backup_directory_configured(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let profile_dir = world
+        .profile_dir
+        .clone()
+        .unwrap_or_else(|| workspace.join("profile"));
+    fs::create_dir_all(&profile_dir).expect("failed to create profile dir");
+    world.profile_dir = Some(profile_dir.clone());
+
+    let backup_dir = workspace.join("backups");
+    fs::create_dir_all(&backup_dir).expect("failed to create backup dir");
+    world.backup_dir = Some(backup_dir.clone());
+
+    write_settings_for_profile(&workspace, &profile_dir, &backup_dir);
+}
+
 #[when("the status command is run")]
 async fn run_status(world: &mut AcceptanceWorld) {
     run_command(world, "status");
@@ -77,6 +162,43 @@ async fn run_status(world: &mut AcceptanceWorld) {
 #[when("the list command is run")]
 async fn run_list(world: &mut AcceptanceWorld) {
     run_command(world, "list");
+}
+
+#[when("a daily backup is created")]
+async fn backup_daily(world: &mut AcceptanceWorld) {
+    run_command(world, "backup daily");
+}
+
+#[when("a weekly backup is created")]
+async fn backup_weekly(world: &mut AcceptanceWorld) {
+    run_command(world, "backup weekly");
+}
+
+#[when("the configuration is loaded")]
+async fn configuration_loaded(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let env_guard = EnvGuard::from_world(world);
+    match load_config(true, &workspace) {
+        Ok(Some(config)) => {
+            world.exit_code = 0;
+            world.stderr.clear();
+            world.loaded_config = Some(config);
+        }
+        Ok(None) => {
+            world.exit_code = 1;
+            world.stderr = "config file not found".to_string();
+            world.loaded_config = None;
+        }
+        Err(error) => {
+            world.exit_code = 1;
+            world.stderr = match error {
+                zen_backup::config::ConfigError::NotFound(message)
+                | zen_backup::config::ConfigError::Parse(message) => message,
+            };
+            world.loaded_config = None;
+        }
+    }
+    drop(env_guard);
 }
 
 #[then(expr = "stdout contains {string}")]
@@ -129,6 +251,65 @@ async fn exit_code_non_zero(world: &mut AcceptanceWorld) {
     assert_ne!(world.exit_code, 0, "expected non-zero exit code");
 }
 
+#[then(expr = "profile.path equals the expanded value of {string}")]
+async fn profile_path_equals_expanded(world: &mut AcceptanceWorld, raw_path: String) {
+    let profile_path = world
+        .loaded_config
+        .as_ref()
+        .expect("configuration should be loaded")
+        .profile_path
+        .clone();
+    let home = ensure_workspace(world);
+    let expected = if let Some(suffix) = raw_path.strip_prefix("~/") {
+        home.join(suffix).display().to_string()
+    } else {
+        raw_path
+    };
+    assert_eq!(profile_path, expected);
+}
+
+#[then(expr = "an archive exists matching pattern {string}")]
+async fn archive_exists_matching_pattern(world: &mut AcceptanceWorld, pattern: String) {
+    let archive = world
+        .last_archive
+        .as_ref()
+        .expect("expected archive path from backup output");
+    assert!(
+        archive.exists(),
+        "archive does not exist at {}",
+        archive.display()
+    );
+    let name = archive
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    let matches = if pattern.contains("zen-backup-daily-") {
+        name.starts_with("zen-backup-daily-") && name.ends_with(".tar.gz") && name.len() >= 30
+    } else if pattern.contains("zen-backup-weekly-") {
+        name.starts_with("zen-backup-weekly-") && name.ends_with(".tar.gz") && name.len() >= 31
+    } else {
+        false
+    };
+    assert!(
+        matches,
+        "archive `{name}` does not satisfy expected pattern `{pattern}`"
+    );
+}
+
+#[then(expr = "the archive is in the {string} subdirectory")]
+async fn archive_in_subdirectory(world: &mut AcceptanceWorld, subdirectory: String) {
+    let archive = world
+        .last_archive
+        .as_ref()
+        .expect("expected archive path from backup output");
+    let parent = archive
+        .parent()
+        .and_then(|value| value.file_name())
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    assert_eq!(parent, subdirectory, "archive parent directory mismatch");
+}
+
 #[tokio::main]
 async fn main() {
     let list_feature =
@@ -149,6 +330,17 @@ async fn main() {
     AcceptanceWorld::filter_run(status_feature, |feature, _, scenario| {
         feature.name == "Status"
             && scenario.name == "Status shows \"Not installed\" when settings.toml is missing"
+    })
+    .await;
+
+    let backup_feature =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/features/core/backup.feature");
+    AcceptanceWorld::filter_run(backup_feature, |feature, _, scenario| {
+        feature.name == "Backup"
+            && matches!(
+                scenario.name.as_str(),
+                "Create a daily backup manually" | "Create a weekly backup manually"
+            )
     })
     .await;
 }
@@ -195,11 +387,13 @@ fn write_settings(workspace: &Path, backup_dir: &Path) {
 
 fn run_command(world: &mut AcceptanceWorld, command: &str) {
     let workspace = world.workspace.as_ref().expect("workspace not initialized");
+    let args: Vec<&str> = command.split_whitespace().collect();
     let output = Command::new(resolve_cli_path())
-        .arg(command)
+        .args(&args)
         .current_dir(workspace.path())
         .env("HOME", workspace.path())
         .env("ZEN_BACKUP_TEST_OS", "darwin")
+        .envs(world.env.clone())
         .output()
         .expect("failed to execute zen-backup");
 
@@ -210,6 +404,42 @@ fn run_command(world: &mut AcceptanceWorld, command: &str) {
     world.stderr = String::from_utf8_lossy(&output.stderr)
         .trim_end()
         .to_string();
+    world.last_archive = extract_archive_path(&world.stdout);
+}
+
+struct EnvGuard {
+    saved: Vec<(String, Option<String>)>,
+}
+
+impl EnvGuard {
+    fn from_world(world: &AcceptanceWorld) -> Self {
+        let mut saved = Vec::new();
+        let workspace = world.workspace.as_ref().expect("workspace not initialized");
+        set_env_capture("HOME", workspace.path().display().to_string(), &mut saved);
+        set_env_capture("ZEN_BACKUP_TEST_OS", "darwin".to_string(), &mut saved);
+        for (key, value) in &world.env {
+            set_env_capture(key, value.clone(), &mut saved);
+        }
+        Self { saved }
+    }
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        for (key, previous) in self.saved.iter().rev() {
+            if let Some(value) = previous {
+                std::env::set_var(key, value);
+            } else {
+                std::env::remove_var(key);
+            }
+        }
+    }
+}
+
+fn set_env_capture(key: &str, value: String, saved: &mut Vec<(String, Option<String>)>) {
+    let previous = std::env::var(key).ok();
+    saved.push((key.to_string(), previous));
+    std::env::set_var(key, value);
 }
 
 fn header_map(header: &[String]) -> HashMap<String, usize> {
@@ -241,4 +471,51 @@ fn parse_size_to_bytes(value: &str) -> usize {
         return number as usize;
     }
     256
+}
+
+fn docstring(step: &Step) -> String {
+    step.docstring
+        .as_ref()
+        .cloned()
+        .expect("expected docstring content")
+}
+
+fn extract_archive_path(stdout: &str) -> Option<PathBuf> {
+    let marker = "Created ";
+    let path_marker = " backup: ";
+    for line in stdout.lines() {
+        if line.starts_with(marker) && line.contains(path_marker) {
+            let path = line.split(path_marker).nth(1)?;
+            return Some(PathBuf::from(path.trim()));
+        }
+    }
+    None
+}
+
+fn write_settings_for_profile(workspace: &Path, profile_dir: &Path, backup_dir: &Path) {
+    let config_dir = workspace.join(".config/zen-profile-backup");
+    fs::create_dir_all(&config_dir).expect("failed to create config dir");
+    let config_body = format!(
+        "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
+        profile_dir.display(),
+        backup_dir.display(),
+    );
+    fs::write(config_dir.join("settings.toml"), config_body).expect("failed to write settings");
+}
+
+fn is_sqlite_file(path: &str) -> bool {
+    path.ends_with(".sqlite") || path.ends_with(".db")
+}
+
+fn create_sqlite_db(path: &Path) {
+    let output = Command::new("sqlite3")
+        .arg(path)
+        .arg("CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY, v TEXT);")
+        .output()
+        .expect("failed to execute sqlite3");
+    assert!(
+        output.status.success(),
+        "failed to create sqlite db: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
