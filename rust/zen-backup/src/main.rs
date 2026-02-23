@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::process::Command;
 use zen_backup::cli;
 
 fn main() {
@@ -133,32 +132,15 @@ fn main() {
             std::process::exit(out.exit_code);
         }
         Some(_) => {
-            let code = delegate_to_typescript(&args);
-            debug.debug(&format!("exitCode={code}"));
-            std::process::exit(code);
+            let command = args.first().map(String::as_str).unwrap_or_default();
+            eprintln!("Unknown command: {command}\n");
+            eprintln!("{}", cli::help::render_root_help());
+            debug.debug("exitCode=1");
+            std::process::exit(1);
         }
         None => {
             eprintln!("{}", cli::help::render_root_help());
             std::process::exit(1);
-        }
-    }
-}
-
-fn delegate_to_typescript(args: &[String]) -> i32 {
-    let mut cmd = Command::new("deno");
-    cmd.arg("run")
-        .arg("-A")
-        .arg("src/main.ts")
-        .args(args)
-        .env("ZEN_BACKUP_USE_TS_CLI", "1")
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit());
-
-    match cmd.status() {
-        Ok(status) => status.code().unwrap_or(1),
-        Err(err) => {
-            eprintln!("failed to launch TypeScript fallback runtime: {err}");
-            1
         }
     }
 }
