@@ -1,4 +1,5 @@
 use cucumber::{gherkin::Step, given, then, when, World as _};
+use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -246,6 +247,51 @@ async fn zen_browser_running(world: &mut AcceptanceWorld) {
         .insert("ZEN_BACKUP_BROWSER_RUNNING".to_string(), "1".to_string());
 }
 
+#[given("GitHub CLI is available")]
+async fn github_cli_available(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_GH_AVAILABLE".to_string(), "1".to_string());
+    world.env.insert(
+        "ZEN_BACKUP_TEST_GH_CREATED_URL".to_string(),
+        "https://github.com/prometheas/zen-browser-profile-snapshots/issues/123".to_string(),
+    );
+}
+
+#[given("GitHub CLI is unavailable")]
+async fn github_cli_unavailable(world: &mut AcceptanceWorld) {
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_GH_AVAILABLE".to_string(), "0".to_string());
+    world
+        .env
+        .insert("ZEN_BACKUP_TEST_BROWSER_OPEN".to_string(), "1".to_string());
+}
+
+#[given("feedback answers are provided:")]
+async fn feedback_answers_provided(world: &mut AcceptanceWorld, step: &Step) {
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let field_index = *headers.get("field").expect("missing field column");
+    let value_index = *headers.get("value").expect("missing value column");
+
+    let mut json = Map::<String, Value>::new();
+    for row in table.rows.iter().skip(1) {
+        let field = row[field_index].trim();
+        let value = row[value_index].trim();
+        if field.is_empty() {
+            continue;
+        }
+        json.insert(field.to_string(), Value::String(value.to_string()));
+    }
+    world.env.insert(
+        "ZEN_BACKUP_TEST_FEEDBACK_ANSWERS".to_string(),
+        Value::Object(json).to_string(),
+    );
+}
+
 #[given("the backup tool is installed")]
 async fn backup_tool_installed(world: &mut AcceptanceWorld) {
     let workspace = ensure_workspace(world);
@@ -327,6 +373,16 @@ async fn quoted_command_run(world: &mut AcceptanceWorld, command: String) {
 #[when("the uninstall command is run")]
 async fn uninstall_command_run(world: &mut AcceptanceWorld) {
     run_command(world, "uninstall");
+}
+
+#[when("the feedback bug command is run")]
+async fn feedback_bug_command_run(world: &mut AcceptanceWorld) {
+    run_command(world, "feedback bug");
+}
+
+#[when("the feedback request command is run")]
+async fn feedback_request_command_run(world: &mut AcceptanceWorld) {
+    run_command(world, "feedback request");
 }
 
 #[when("the configuration is loaded")]
@@ -668,6 +724,19 @@ async fn main() {
             )
     })
     .await;
+
+    let feedback_feature =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/features/core/feedback.feature");
+    AcceptanceWorld::filter_run(feedback_feature, |feature, _, scenario| {
+        feature.name == "Feedback submission"
+            && matches!(
+                scenario.name.as_str(),
+                "Submit bug feedback via GitHub CLI"
+                    | "Submit request feedback via GitHub CLI"
+                    | "Fallback to browser when GitHub CLI is unavailable"
+            )
+    })
+    .await;
 }
 
 fn resolve_cli_path() -> PathBuf {
@@ -711,7 +780,7 @@ fn write_settings(workspace: &Path, backup_dir: &Path) {
 }
 
 fn run_command(world: &mut AcceptanceWorld, command: &str) {
-    let workspace = world.workspace.as_ref().expect("workspace not initialized");
+    let workspace = ensure_workspace(world);
     let normalized = command
         .strip_prefix("zen-backup ")
         .unwrap_or(command)
@@ -719,8 +788,8 @@ fn run_command(world: &mut AcceptanceWorld, command: &str) {
     let args: Vec<&str> = normalized.split_whitespace().collect();
     let output = Command::new(resolve_cli_path())
         .args(&args)
-        .current_dir(workspace.path())
-        .env("HOME", workspace.path())
+        .current_dir(&workspace)
+        .env("HOME", &workspace)
         .env("ZEN_BACKUP_TEST_OS", "darwin")
         .envs(world.env.clone())
         .output()
