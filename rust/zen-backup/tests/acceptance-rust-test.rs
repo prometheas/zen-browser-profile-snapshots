@@ -15,6 +15,7 @@ struct AcceptanceWorld {
     backup_dir: Option<PathBuf>,
     last_archive: Option<PathBuf>,
     pending_restore_archive: Option<PathBuf>,
+    tracked_backup_archives: Vec<PathBuf>,
     stdout: String,
     stderr: String,
     exit_code: i32,
@@ -265,6 +266,32 @@ async fn command_was_run(world: &mut AcceptanceWorld, command: String) {
     assert_eq!(world.exit_code, 0, "command failed: {}", world.stderr);
 }
 
+#[given("backup archives exist in the backup directory")]
+async fn backup_archives_exist(world: &mut AcceptanceWorld) {
+    ensure_backup_workspace(world);
+    let backup_dir = world
+        .backup_dir
+        .as_ref()
+        .expect("backup directory should be configured");
+    let archive = backup_dir
+        .join("daily")
+        .join("zen-backup-daily-2026-01-15.tar.gz");
+    if let Some(parent) = archive.parent() {
+        fs::create_dir_all(parent).expect("failed to create archive parent");
+    }
+    fs::write(&archive, b"archive").expect("failed to write backup archive");
+    world.tracked_backup_archives.push(archive);
+}
+
+#[given("settings.toml exists")]
+async fn settings_toml_exists(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let config_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    if !config_path.exists() {
+        ensure_backup_workspace(world);
+    }
+}
+
 #[when("the status command is run")]
 async fn run_status(world: &mut AcceptanceWorld) {
     run_command(world, "status");
@@ -295,6 +322,11 @@ async fn restore_with_archive(world: &mut AcceptanceWorld, archive_name: String)
 #[when(expr = "{string} is run")]
 async fn quoted_command_run(world: &mut AcceptanceWorld, command: String) {
     run_command(world, &command);
+}
+
+#[when("the uninstall command is run")]
+async fn uninstall_command_run(world: &mut AcceptanceWorld) {
+    run_command(world, "uninstall");
 }
 
 #[when("the configuration is loaded")]
@@ -356,6 +388,15 @@ async fn stderr_contains_either(world: &mut AcceptanceWorld, left: String, right
     assert!(
         world.stderr.contains(&left) || world.stderr.contains(&right),
         "expected stderr to contain `{left}` or `{right}`, got `{}`",
+        world.stderr
+    );
+}
+
+#[then(expr = "stderr contains {string}")]
+async fn stderr_contains(world: &mut AcceptanceWorld, needle: String) {
+    assert!(
+        world.stderr.contains(&needle),
+        "expected stderr to contain `{needle}`, got `{}`",
         world.stderr
     );
 }
@@ -527,6 +568,31 @@ async fn backup_completes_successfully(world: &mut AcceptanceWorld) {
     assert_eq!(world.exit_code, 0, "backup should complete successfully");
 }
 
+#[then("all backup archives still exist")]
+async fn all_backup_archives_still_exist(world: &mut AcceptanceWorld) {
+    assert!(
+        !world.tracked_backup_archives.is_empty(),
+        "no tracked archives available for assertion"
+    );
+    for archive in &world.tracked_backup_archives {
+        assert!(
+            archive.exists(),
+            "expected backup archive to be preserved: {}",
+            archive.display()
+        );
+    }
+}
+
+#[then("settings.toml does not exist")]
+async fn settings_toml_missing(world: &mut AcceptanceWorld) {
+    let workspace = ensure_workspace(world);
+    let config_path = workspace.join(".config/zen-profile-backup/settings.toml");
+    assert!(
+        !config_path.exists(),
+        "settings.toml should be removed by uninstall"
+    );
+}
+
 #[tokio::main]
 async fn main() {
     let list_feature =
@@ -587,6 +653,19 @@ async fn main() {
         feature.name == "Notifications"
             && scenario.name
                 == "Warning notification via terminal-notifier or osascript when browser is running"
+    })
+    .await;
+
+    let install_feature = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/features/platform/install.feature");
+    AcceptanceWorld::filter_run(install_feature, |feature, _, scenario| {
+        feature.name == "Install"
+            && matches!(
+                scenario.name.as_str(),
+                "Uninstall preserves backup archives"
+                    | "Uninstall removes settings.toml"
+                    | "Uninstall warns when backups are preserved"
+            )
     })
     .await;
 }
