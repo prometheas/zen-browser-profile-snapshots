@@ -43,6 +43,8 @@ Use this guide when creating tests, choosing test scope, and running validation.
   - `deno task test:integration`
 - Acceptance (all):
   - `deno task test:acceptance`
+- Acceptance (rust harness smoke):
+  - `deno task test:acceptance:rust`
   - feedback-only:
     - `deno run -A npm:@cucumber/cucumber@12.6.0 --import tests/acceptance/support/world.ts --import tests/acceptance/steps/index.ts docs/features/core/feedback.feature`
 - Acceptance (platform):
@@ -81,6 +83,7 @@ Use this guide when creating tests, choosing test scope, and running validation.
 ## Acceptance Runtime Notes
 
 - Acceptance execution is wrapped by `scripts/task--test-acceptance.ts`.
+- Rust acceptance smoke execution is wrapped by `scripts/task--test-acceptance--rust.ts`.
 - Do not copy long raw Cucumber commands unless debugging task-wrapper behavior.
 - If a scenario timing issue occurs, adjust step timeout intentionally and keep it scoped.
 

@@ -29,6 +29,7 @@
     "test:acceptance:platform:windows": "deno run -A scripts/task--test-acceptance.ts platform-windows",
     "test:acceptance:platform": "deno run -A scripts/task--test-acceptance.ts platform",
     "test:acceptance:m1": "deno run -A scripts/task--test-acceptance.ts m1",
+    "test:acceptance:rust": "deno run -A scripts/task--test-acceptance--rust.ts smoke",
     "test": "deno task test:unit && deno task test:integration",
     "typecheck": "deno check src/main.ts tests/unit/**/*.ts tests/integration/**/*.ts tests/acceptance/**/*.ts",
     "lint": "deno lint src tests",
