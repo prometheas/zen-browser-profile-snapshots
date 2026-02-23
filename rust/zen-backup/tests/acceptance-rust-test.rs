@@ -14,6 +14,7 @@ struct AcceptanceWorld {
     profile_dir: Option<PathBuf>,
     backup_dir: Option<PathBuf>,
     last_archive: Option<PathBuf>,
+    pending_restore_archive: Option<PathBuf>,
     stdout: String,
     stderr: String,
     exit_code: i32,
@@ -154,6 +155,89 @@ async fn backup_directory_configured(world: &mut AcceptanceWorld) {
     write_settings_for_profile(&workspace, &profile_dir, &backup_dir);
 }
 
+#[given(expr = "a valid backup archive {string} exists")]
+async fn valid_backup_archive_exists(world: &mut AcceptanceWorld, archive_name: String) {
+    let workspace = ensure_workspace(world);
+    let profile_dir = workspace.join("profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create profile dir");
+    world.profile_dir = Some(profile_dir.clone());
+
+    let backup_dir = workspace.join("backups");
+    let daily_dir = backup_dir.join("daily");
+    fs::create_dir_all(&daily_dir).expect("failed to create daily dir");
+    world.backup_dir = Some(backup_dir.clone());
+    world.pending_restore_archive = Some(daily_dir.join(archive_name));
+
+    write_settings_for_profile(&workspace, &profile_dir, &backup_dir);
+}
+
+#[given("the archive contains:")]
+async fn archive_contains(world: &mut AcceptanceWorld, step: &Step) {
+    let archive_path = world
+        .pending_restore_archive
+        .clone()
+        .expect("pending archive path not initialized");
+    let staging_dir = tempfile::tempdir().expect("failed to create archive staging dir");
+
+    let Some(table) = step.table.as_ref() else {
+        panic!("expected data table");
+    };
+    let headers = header_map(&table.rows[0]);
+    let file_index = *headers.get("file").expect("missing file column");
+    for row in table.rows.iter().skip(1) {
+        let file = row[file_index].trim();
+        if file.is_empty() {
+            continue;
+        }
+        let path = staging_dir.path().join(file);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("failed to create archive file parent");
+        }
+        if is_sqlite_file(file) {
+            create_sqlite_db(&path);
+        } else {
+            fs::write(path, b"archive-fixture").expect("failed to write archive fixture file");
+        }
+    }
+
+    if let Some(parent) = archive_path.parent() {
+        fs::create_dir_all(parent).expect("failed to create archive parent");
+    }
+    let output = Command::new("tar")
+        .arg("-czf")
+        .arg(&archive_path)
+        .arg("-C")
+        .arg(staging_dir.path())
+        .arg(".")
+        .output()
+        .expect("failed to run tar for archive creation");
+    assert!(
+        output.status.success(),
+        "failed to create archive: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[given("the current profile directory exists with different content")]
+async fn profile_directory_with_different_content(world: &mut AcceptanceWorld) {
+    let profile_dir = world
+        .profile_dir
+        .clone()
+        .expect("profile dir should exist before seeding");
+    fs::create_dir_all(&profile_dir).expect("failed to ensure profile dir");
+    fs::write(
+        profile_dir.join("prefs.js"),
+        b"user_pref(\"different\", true);",
+    )
+    .expect("failed to write profile fixture");
+    create_sqlite_db(&profile_dir.join("places.sqlite"));
+}
+
+#[given("the Zen browser is not running")]
+async fn zen_browser_not_running(world: &mut AcceptanceWorld) {
+    world.env.remove("ZEN_BACKUP_BROWSER_RUNNING");
+}
+
 #[when("the status command is run")]
 async fn run_status(world: &mut AcceptanceWorld) {
     run_command(world, "status");
@@ -172,6 +256,11 @@ async fn backup_daily(world: &mut AcceptanceWorld) {
 #[when("a weekly backup is created")]
 async fn backup_weekly(world: &mut AcceptanceWorld) {
     run_command(world, "backup weekly");
+}
+
+#[when(expr = "restore is run with archive {string}")]
+async fn restore_with_archive(world: &mut AcceptanceWorld, archive_name: String) {
+    run_command(world, &format!("restore {archive_name}"));
 }
 
 #[when("the configuration is loaded")]
@@ -310,6 +399,58 @@ async fn archive_in_subdirectory(world: &mut AcceptanceWorld, subdirectory: Stri
     assert_eq!(parent, subdirectory, "archive parent directory mismatch");
 }
 
+#[then(expr = "the profile directory contains {string}")]
+async fn profile_directory_contains_file(world: &mut AcceptanceWorld, file_name: String) {
+    let profile_dir = world
+        .profile_dir
+        .as_ref()
+        .expect("profile dir should be configured");
+    assert!(
+        profile_dir.join(file_name).exists(),
+        "expected file in profile after restore"
+    );
+}
+
+#[then(expr = "{string} in the profile passes {string}")]
+async fn profile_file_passes_check(world: &mut AcceptanceWorld, file_name: String, sql: String) {
+    let profile_dir = world
+        .profile_dir
+        .as_ref()
+        .expect("profile dir should be configured");
+    let target = profile_dir.join(file_name);
+    let output = Command::new("sqlite3")
+        .arg(target)
+        .arg(sql)
+        .output()
+        .expect("failed to run sqlite3");
+    assert!(
+        output.status.success(),
+        "sqlite command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8_lossy(&output.stdout).to_lowercase();
+    assert!(
+        text.contains("ok"),
+        "expected sqlite integrity check to include ok"
+    );
+}
+
+#[then("stdout contains the archive path")]
+async fn stdout_contains_archive_path(world: &mut AcceptanceWorld) {
+    let archive = world
+        .pending_restore_archive
+        .as_ref()
+        .expect("expected pending restore archive path");
+    let file_name = archive
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    assert!(
+        world.stdout.contains(file_name),
+        "stdout did not include archive path reference"
+    );
+}
+
 #[tokio::main]
 async fn main() {
     let list_feature =
@@ -341,6 +482,13 @@ async fn main() {
                 scenario.name.as_str(),
                 "Create a daily backup manually" | "Create a weekly backup manually"
             )
+    })
+    .await;
+
+    let restore_feature =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/features/core/restore.feature");
+    AcceptanceWorld::filter_run(restore_feature, |feature, _, scenario| {
+        feature.name == "Restore" && scenario.name == "Restore from a daily backup"
     })
     .await;
 }
