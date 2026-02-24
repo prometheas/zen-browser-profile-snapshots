@@ -492,14 +492,6 @@ fn emit_notification(root: &Path, enabled: bool, title: &str, message: &str) -> 
     if !enabled {
         return Ok(());
     }
-    let os = std::env::var("ZEN_BACKUP_TEST_OS")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
-        .unwrap_or_else(|| std::env::consts::OS.to_string());
-    if notification_unavailable_for_os(&os) {
-        let _ = append_log(root, "WARNING", "notifications unavailable");
-        return Ok(());
-    }
     fs::create_dir_all(root).map_err(|_| ())?;
     let log_path = root.join("notifications.log");
     let mut file = fs::OpenOptions::new()
@@ -508,7 +500,17 @@ fn emit_notification(root: &Path, enabled: bool, title: &str, message: &str) -> 
         .open(log_path)
         .map_err(|_| ())?;
     let line = format!("[{}] {}: {}\n", now_iso_timestamp(), title, message);
-    file.write_all(line.as_bytes()).map_err(|_| ())
+    file.write_all(line.as_bytes()).map_err(|_| ())?;
+
+    let os = std::env::var("ZEN_BACKUP_TEST_OS")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| std::env::consts::OS.to_string());
+    if notification_unavailable_for_os(&os) {
+        let _ = append_log(root, "WARNING", "notifications unavailable");
+        return Ok(());
+    }
+    Ok(())
 }
 
 fn local_notification_root(path: &str) -> PathBuf {
