@@ -500,9 +500,8 @@ async fn archive_created_with_absolute_paths(world: &mut AcceptanceWorld) {
     let output = Command::new("tar")
         .arg("-czf")
         .arg(&archive_path)
-        .arg("-P")
+        .arg("--absolute-names")
         .arg(absolute_path.join("places.sqlite"))
-        .arg("-P")
         .arg(absolute_path.join("prefs.js"))
         .output()
         .expect("failed to create absolute-path archive");
@@ -978,6 +977,7 @@ async fn configured_backup_directory_missing(world: &mut AcceptanceWorld) {
 #[given("the backup directory is not readable")]
 async fn backup_directory_not_readable(world: &mut AcceptanceWorld) {
     ensure_backup_workspace(world);
+    #[cfg(unix)]
     let backup_dir = world
         .backup_dir
         .as_ref()
