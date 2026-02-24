@@ -500,7 +500,7 @@ async fn archive_created_with_absolute_paths(world: &mut AcceptanceWorld) {
     let output = Command::new("tar")
         .arg("-czf")
         .arg(&archive_path)
-        .arg("--absolute-names")
+        .arg("-P")
         .arg(absolute_path.join("places.sqlite"))
         .arg(absolute_path.join("prefs.js"))
         .output()
