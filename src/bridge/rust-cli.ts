@@ -31,14 +31,7 @@ export async function runRustCli(
     Object.entries(mergedEnv).filter((entry): entry is [string, string] => entry[1] !== undefined),
   );
   const executablePath = await resolveRustCliPath(options, env);
-  const command = new Deno.Command(executablePath, {
-    args,
-    env,
-    cwd: options.cwd,
-    stdout: "piped",
-    stderr: "piped",
-  });
-  const output = await command.output();
+  const output = await runCommandWithFallback(executablePath, args, env, options.cwd);
   return {
     exitCode: output.code,
     stdout: new TextDecoder().decode(output.stdout).trimEnd(),
@@ -58,12 +51,48 @@ async function resolveRustCliPath(
   }
 
   const workspaceRoot = new URL("../../", import.meta.url);
-  const devBinary = new URL("target/debug/zen-backup", workspaceRoot);
+  const devBinaryName = Deno.build.os === "windows" ? "zen-backup.exe" : "zen-backup";
+  const devBinary = new URL(`target/debug/${devBinaryName}`, workspaceRoot);
   if (await exists(devBinary)) {
-    return fromFileUrl(devBinary);
+    return fileUrlToPath(devBinary);
   }
 
   return "zen-backup";
+}
+
+async function runCommandWithFallback(
+  executablePath: string,
+  args: string[],
+  env: Record<string, string>,
+  cwd?: string,
+): Promise<Deno.CommandOutput> {
+  try {
+    return await new Deno.Command(executablePath, {
+      args,
+      env,
+      cwd,
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound) || executablePath !== "zen-backup") {
+      throw error;
+    }
+    return await new Deno.Command("cargo", {
+      args: [
+        "run",
+        "--quiet",
+        "--manifest-path",
+        resolveManifestPath(),
+        "--",
+        ...args,
+      ],
+      env,
+      cwd,
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+  }
 }
 
 async function exists(pathUrl: URL): Promise<boolean> {
@@ -75,6 +104,15 @@ async function exists(pathUrl: URL): Promise<boolean> {
   }
 }
 
-function fromFileUrl(pathUrl: URL): string {
-  return decodeURIComponent(pathUrl.pathname);
+function resolveManifestPath(): string {
+  const workspaceRoot = new URL("../../", import.meta.url);
+  return fileUrlToPath(new URL("rust/zen-backup/Cargo.toml", workspaceRoot));
+}
+
+function fileUrlToPath(pathUrl: URL): string {
+  const decoded = decodeURIComponent(pathUrl.pathname);
+  if (Deno.build.os === "windows") {
+    return decoded.replace(/^\/([A-Za-z]:)/, "$1").replaceAll("/", "\\");
+  }
+  return decoded;
 }

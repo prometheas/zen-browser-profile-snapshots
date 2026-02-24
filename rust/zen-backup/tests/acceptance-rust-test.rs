@@ -1094,8 +1094,8 @@ async fn configured_profile_path_missing(world: &mut AcceptanceWorld) {
     fs::create_dir_all(&config_dir).expect("failed to create config dir");
     let config_body = format!(
         "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
-        missing_profile.display(),
-        backup_dir.display()
+        toml_string_literal(&missing_profile.display().to_string()),
+        toml_string_literal(&backup_dir.display().to_string())
     );
     fs::write(config_path, config_body).expect("failed to write settings");
 }
@@ -3350,8 +3350,8 @@ fn write_settings(workspace: &Path, backup_dir: &Path) {
     fs::create_dir_all(&config_dir).expect("failed to create config dir");
     let config_body = format!(
         "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
-        profile_dir.display(),
-        backup_dir.display(),
+        toml_string_literal(&profile_dir.display().to_string()),
+        toml_string_literal(&backup_dir.display().to_string()),
     );
     fs::write(config_path, config_body).expect("failed to write settings");
 }
@@ -3627,10 +3627,14 @@ fn write_settings_for_profile(
 
     let mut config_body = format!(
         "[profile]\npath = \"{}\"\n\n[backup]\nlocal_path = \"{}\"\n",
-        profile_path, backup_local_path
+        toml_string_literal(&profile_path),
+        toml_string_literal(&backup_local_path)
     );
     if let Some(cloud) = backup_cloud_path {
-        config_body.push_str(&format!("cloud_path = \"{}\"\n", cloud));
+        config_body.push_str(&format!(
+            "cloud_path = \"{}\"\n",
+            toml_string_literal(&cloud)
+        ));
     }
     if !world.config_overrides.is_empty() {
         let mut section_keys: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
@@ -3661,12 +3665,30 @@ fn write_settings_for_profile(
                 {
                     config_body.push_str(&format!("{field} = {value}\n"));
                 } else {
-                    config_body.push_str(&format!("{field} = \"{value}\"\n"));
+                    config_body.push_str(&format!(
+                        "{field} = \"{}\"\n",
+                        toml_string_literal(value)
+                    ));
                 }
             }
         }
     }
     fs::write(config_path, config_body).expect("failed to write settings");
+}
+
+fn toml_string_literal(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
 }
 
 fn rewrite_settings_from_world(world: &AcceptanceWorld) {
